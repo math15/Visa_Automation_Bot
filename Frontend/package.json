@@ -1,0 +1,52 @@
+{
+  "name": "my-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "nx exec -- nx exec -- next build",
+    "start": "next start",
+    "lint": "nx exec -- nx exec -- next lint",
+    "lint:fix": "nx exec -- nx exec -- next lint --fix",
+    "preview": "next build && next start",
+    "typecheck": "nx exec -- nx exec -- tsc --noEmit",
+    "format:write": "nx exec -- nx exec -- prettier --write \"**/*.{ts,tsx,mdx}\" --cache",
+    "format:check": "nx exec -- nx exec -- prettier --check \"**/*.{ts,tsx,mdx}\" --cache",
+    "format:all": "nx exec -- nx exec -- prettier --config .prettierrc --ignore-path .prettierignore --write ."
+  },
+  "dependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.1.1",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.2.6",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.424.0",
+    "million": "^3.1.11",
+    "next": "^14.2.5",
+    "next-themes": "^0.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sharp": "^0.33.4",
+    "tailwind-merge": "^2.4.0",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.8.3",
+    "@nx/next": "19.5.6",
+    "@types/bun": "^1.1.6",
+    "@types/node": "^22.1.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "nx": "19.5.6",
+    "postcss": "^8.4.41",
+    "postcss-import": "^16.1.0",
+    "tailwindcss": "^3.4.7",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "nx": {}
+}
