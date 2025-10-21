@@ -16,7 +16,8 @@ class CaptchaSubmitter:
     
     async def submit_captcha_solution(self, captcha_id: str, selected_image_ids: List[str], 
                                     captcha_data: str, aws_waf_token: str = None, 
-                                    cookies: Dict[str, str] = None, proxy_url: str = None) -> bool:
+                                    cookies: Dict[str, str] = None, proxy_url: str = None, 
+                                    captcha_page_url: str = None) -> bool:
         """
         Submit captcha solution to BLS endpoint
         
@@ -44,21 +45,76 @@ class CaptchaSubmitter:
             logger.info(f"🌐 Using proxy for HTTP request: {proxy_url}")
             
             # Prepare headers and cookies
-            headers, session_cookies = self._prepare_headers(aws_waf_token, cookies)
+            headers, session_cookies = self._prepare_headers(aws_waf_token, cookies, captcha_page_url)
             
             # Prepare data
-            request_verification_token = cookies.get('antiforgery_cookie', '') if cookies else ''
+            request_verification_token = cookies.get('__RequestVerificationToken', '') if cookies else ''
             data = self._prepare_submission_data(captcha_id, selected_image_ids, captcha_data, request_verification_token)
             
-            # Submit captcha with WAF bypass handling
-            submission_url = "https://algeria.blsspainglobal.com/dza/CaptchaPublic/SubmitCaptcha"
+            # DEBUG: Log all form data being sent
+            logger.info("🔍 DEBUG - Form data being sent via POST:")
+            logger.info(f"🔍 DEBUG - Id: {captcha_id}")
+            logger.info(f"🔍 DEBUG - SelectedImages: {','.join(selected_image_ids)}")
+            logger.info(f"🔍 DEBUG - Captcha: {captcha_data}")
+            logger.info(f"🔍 DEBUG - __RequestVerificationToken: {request_verification_token}")
+            logger.info(f"🔍 DEBUG - Total form data: {data}")
             
-            async with aiohttp.ClientSession() as session:
+            # DEBUG: Log headers being sent
+            logger.info("🔍 DEBUG - Headers being sent:")
+            for key, value in headers.items():
+                if key.lower() == 'cookie':
+                    logger.info(f"🔍 DEBUG - {key}: {value[:100]}...")
+                else:
+                    logger.info(f"🔍 DEBUG - {key}: {value}")
+            
+            # DEBUG: Log cookies being sent
+            logger.info("🔍 DEBUG - Cookies being sent:")
+            for key, value in session_cookies.items():
+                logger.info(f"🔍 DEBUG - {key}: {value[:50]}...")
+            
+            # DEBUG: Log submission URL
+            submission_url = "https://algeria.blsspainglobal.com/dza/CaptchaPublic/SubmitCaptcha"
+            logger.info(f"🔍 DEBUG - Submission URL: {submission_url}")
+            
+            # Submit captcha with WAF bypass handling
+            
+            # DEBUG: Log the actual POST request body
+            import urllib.parse
+            post_body = urllib.parse.urlencode(data)
+            logger.info(f"🔍 DEBUG - POST request body: {post_body}")
+            logger.info(f"🔍 DEBUG - POST body length: {len(post_body)} characters")
+            
+            # DEBUG: Check if token is fresh (extracted from captcha page)
+            logger.info(f"🔍 DEBUG - Token source: {'captcha_page' if request_verification_token else 'missing'}")
+            logger.info(f"🔍 DEBUG - Token length: {len(request_verification_token) if request_verification_token else 0}")
+            
+            # DEBUG: Check critical session cookies
+            logger.info(f"🔍 DEBUG - Has visitorId_current: {'visitorId_current' in session_cookies}")
+            
+            # Check for any antiforgery cookie (they have dynamic names)
+            has_antiforgery = any(key.startswith('.AspNetCore.Antiforgery.') for key in session_cookies.keys())
+            logger.info(f"🔍 DEBUG - Has antiforgery cookie: {has_antiforgery}")
+            
+            logger.info(f"🔍 DEBUG - Has aws-waf-token: {'aws-waf-token' in session_cookies}")
+            
+            # DEBUG: Show all cookie names
+            logger.info(f"🔍 DEBUG - All cookie names: {list(session_cookies.keys())}")
+            
+            # Convert curl_cffi cookies to aiohttp-compatible format
+            aiohttp_cookies = {}
+            if session_cookies:
+                # Filter out cookie attributes and create clean dictionary
+                for name, value in session_cookies.items():
+                    if name not in ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']:
+                        aiohttp_cookies[name] = value
+                
+                logger.info(f"🔍 DEBUG - Converted cookies for aiohttp: {aiohttp_cookies}")
+            
+            async with aiohttp.ClientSession(cookies=aiohttp_cookies) as session:
                 async with session.post(
                     submission_url,
                     headers=headers,
                     data=data,
-                    cookies=session_cookies,
                     proxy=proxy_url,
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
@@ -89,7 +145,7 @@ class CaptchaSubmitter:
                         # Try to solve the WAF challenge for the captcha submission URL
                         from .waf_bypass import WAFBypassHandler
                         waf_handler = WAFBypassHandler("https://algeria.blsspainglobal.com", "/dza/CaptchaPublic/SubmitCaptcha", "temp_visitor_id")
-                        bypass_result = await waf_handler.try_comprehensive_bypass(proxy_url, headers)
+                        bypass_result = await waf_handler.try_comprehensive_bypass(proxy_url, headers, "POST", data)
                         
                         if bypass_result and bypass_result.get('success'):
                             logger.info("✅ AWS WAF challenge solved for captcha submission!")
@@ -159,21 +215,23 @@ class CaptchaSubmitter:
             logger.error(f"❌ Error getting proxy: {e}")
             return None
     
-    def _prepare_headers(self, aws_waf_token: str = None, cookies: Dict[str, str] = None) -> tuple:
+    def _prepare_headers(self, aws_waf_token: str = None, cookies: Dict[str, str] = None, captcha_page_url: str = None) -> tuple:
         """Prepare headers and cookies for captcha submission"""
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'es-ES,es;q=0.9',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'Origin': 'https://algeria.blsspainglobal.com',
-            'Referer': 'https://algeria.blsspainglobal.com/dza/account/RegisterUser',
-            'DNT': '1',
-            'Connection': 'keep-alive',
+            'Referer': captcha_page_url,
+            'Priority': 'u=1, i',
+            'Sec-Ch-Ua': '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'empty',
             'Sec-Fetch-Mode': 'cors',
             'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
             'X-Requested-With': 'XMLHttpRequest',
         }
         
@@ -198,11 +256,11 @@ class CaptchaSubmitter:
             'Captcha': captcha_data
         }
         
-        # Add request verification token if provided
+        # Add request verification token if provided (REQUIRED for captcha submission!)
         if request_verification_token:
-            data['_RequestVerificationToken'] = request_verification_token
+            data['__RequestVerificationToken'] = request_verification_token
         
-        logger.info(f"📤 Submission data: Id={captcha_id}, SelectedImages={selected_ids_str}")
+        logger.info(f"📤 Submission data: Id={captcha_id[:20]}..., SelectedImages={selected_ids_str}, Captcha={captcha_data[:20]}..., __RequestVerificationToken={request_verification_token[:20] if request_verification_token else 'None'}...")
         return data
     
     async def _store_captcha_response(self, captcha_id: str, response_text: str):

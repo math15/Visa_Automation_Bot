@@ -20,7 +20,7 @@ class WAFBypassHandler:
         self.register_url = register_url
         self.visitor_id = visitor_id
     
-    async def try_comprehensive_bypass(self, proxy_url: str, headers: dict) -> Optional[Dict[str, Any]]:
+    async def try_comprehensive_bypass(self, proxy_url: str, headers: dict, method: str = "GET", data: dict = None) -> Optional[Dict[str, Any]]:
         """Try comprehensive WAF bypass approaches with retry logic"""
         max_retries = 2
         
@@ -37,7 +37,7 @@ class WAFBypassHandler:
                 
                 for technique in bypass_techniques:
                     try:
-                        result = await technique(proxy_url, headers)
+                        result = await technique(proxy_url, headers, method, data)
                         if result:
                             logger.info("✅ WAF bypass successful!")
                             extracted_result = self._extract_result_data(result)
@@ -129,7 +129,7 @@ class WAFBypassHandler:
             "cookies": session_cookies
         }
     
-    async def _try_aws_waf_bypass(self, proxy_url: str, headers: dict) -> Optional[str]:
+    async def _try_aws_waf_bypass(self, proxy_url: str, headers: dict, method: str = "GET", data: dict = None) -> Optional[str]:
         """Try AWS WAF bypass using awswaf project"""
         try:
             logger.info("🔄 Attempting AWS WAF bypass with direct implementation...")
@@ -187,7 +187,15 @@ class WAFBypassHandler:
             
             # Use longer timeout for captcha pages
             timeout_seconds = 30 if '/CaptchaPublic/' in target_url or 'GenerateCaptcha' in target_url else 15
-            response = session.get(target_url, timeout=timeout_seconds)
+            
+            # Support both GET and POST requests
+            if method.upper() == "POST" and data:
+                logger.info(f"🌐 Making POST request with data: {len(str(data))} characters")
+                response = session.post(target_url, data=data, timeout=timeout_seconds)
+            else:
+                logger.info(f"🌐 Making GET request")
+                response = session.get(target_url, timeout=timeout_seconds)
+            
             logger.info(f"📡 BLS response: {response.status_code}")
             
             # If we get 403, try different approaches
@@ -321,7 +329,13 @@ class WAFBypassHandler:
                 # Detect if this is a captcha page
                 is_captcha_page = '/CaptchaPublic/' in self.register_url or 'GenerateCaptcha' in self.register_url
                 
-                solved_response = session.get(target_url, timeout=timeout_seconds)
+                # Make the second request with the same method as the first
+                if method.upper() == "POST" and data:
+                    logger.info(f"🌐 Making POST request with WAF token and data: {len(str(data))} characters")
+                    solved_response = session.post(target_url, data=data, timeout=timeout_seconds)
+                else:
+                    logger.info(f"🌐 Making GET request with WAF token")
+                    solved_response = session.get(target_url, timeout=timeout_seconds)
                 logger.info(f"📡 Solved response: {solved_response.status_code}")
                 logger.info(f"📡 Solved response content length: {len(solved_response.text)}")
                 logger.info(f"📡 Solved response headers: {dict(solved_response.headers)}")
@@ -339,6 +353,10 @@ class WAFBypassHandler:
                     for name, value in cookies:
                         session_cookies[name] = value
                         logger.info(f"🍪 Parsed cookie: {name}={value[:20]}...")
+                
+                # CRITICAL: Add visitorId_current cookie (required for session tracking)
+                session_cookies['visitorId_current'] = self.visitor_id
+                logger.info(f"🍪 Added visitorId_current cookie: {self.visitor_id}")
                 
                 # Save captcha page response for debugging
                 if is_captcha_page:
@@ -405,7 +423,7 @@ class WAFBypassHandler:
             logger.warning(f"⚠️ AWS WAF bypass error: {e}")
             return None
     
-    async def _try_tesla_waf_bypass(self, proxy_url: str, headers: dict) -> Optional[str]:
+    async def _try_tesla_waf_bypass(self, proxy_url: str, headers: dict, method: str = "GET", data: dict = None) -> Optional[str]:
         """Try Tesla 2.0 comprehensive WAF bypass techniques"""
         try:
             logger.info("🔄 Attempting Tesla 2.0 WAF bypass...")
@@ -433,7 +451,7 @@ class WAFBypassHandler:
             logger.warning(f"⚠️ Tesla WAF bypass error: {e}")
             return None
     
-    async def _try_direct_bypass(self, proxy_url: str, headers: dict) -> Optional[str]:
+    async def _try_direct_bypass(self, proxy_url: str, headers: dict, method: str = "GET", data: dict = None) -> Optional[str]:
         """Try direct bypass with enhanced headers"""
         try:
             logger.info("🔄 Attempting direct bypass...")

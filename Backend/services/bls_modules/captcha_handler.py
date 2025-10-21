@@ -120,7 +120,7 @@ class CaptchaHandler:
         
         try:
             # Get page content (captcha page will generate its own fresh WAF token)
-            content = await self._get_captcha_page_content(page_url, cookies, proxy_url, form_data)
+            content, cookies = await self._get_captcha_page_content(page_url, cookies, proxy_url, form_data)
             if not content:
                 logger.error("❌ Failed to get captcha page content")
                 return {}
@@ -139,7 +139,8 @@ class CaptchaHandler:
                 "image_ids": image_ids,
                 "instruction": instruction,
                 "content": content,
-                "captcha_fields": captcha_fields
+                "captcha_fields": captcha_fields,
+                "cookies": cookies  # Return the fresh cookies from captcha page
             }
             
         except Exception as e:
@@ -147,7 +148,7 @@ class CaptchaHandler:
             return {}
     
     def _extract_captcha_page_fields(self, captcha_page_content: str) -> Dict[str, str]:
-        """Extract Id and Captcha fields from the captcha page HTML"""
+        """Extract Id, Captcha, and __RequestVerificationToken fields from the captcha page HTML"""
         try:
             import re
             
@@ -172,6 +173,14 @@ class CaptchaHandler:
                 captcha_data = captcha_data.replace('&#x2B;', '+').replace('&amp;', '&')
                 result['Captcha'] = captcha_data
                 logger.info(f"✅ Extracted captcha page Captcha: {captcha_data[:20]}...")
+            
+            # Extract __RequestVerificationToken field (REQUIRED for captcha submission!)
+            token_pattern = r'<input[^>]*name="__RequestVerificationToken"[^>]*value="([^"]*)"'
+            token_match = re.search(token_pattern, captcha_page_content)
+            if token_match:
+                request_token = token_match.group(1)
+                result['__RequestVerificationToken'] = request_token
+                logger.info(f"✅ Extracted captcha page __RequestVerificationToken: {request_token[:20]}...")
             
             return result
                 
@@ -282,6 +291,33 @@ class CaptchaHandler:
             instruction = result["instruction"]
             captcha_fields = result.get("captcha_fields", {})
             
+            # CRITICAL: Get the fresh cookies from the captcha page request
+            # These include the new aws-waf-token and visitorId_current
+            captcha_page_cookies = result.get("cookies", {})
+            logger.info(f"🔍 DEBUG - Captcha page cookies: {captcha_page_cookies}")
+            
+            # CRITICAL: Merge original session cookies with fresh captcha page cookies
+            # The original session cookies contain visitorId_current and antiforgery cookies
+            # The captcha page cookies contain the fresh aws-waf-token
+            merged_cookies = {}
+            
+            # Add original session cookies (visitorId_current, antiforgery, etc.)
+            if session_cookies:
+                for key, value in session_cookies.items():
+                    if key not in ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']:
+                        merged_cookies[key] = value
+                        logger.info(f"🔍 DEBUG - Added original cookie: {key} = {value[:50]}...")
+            
+            # Add/override with fresh captcha page cookies (aws-waf-token, etc.)
+            if captcha_page_cookies:
+                for key, value in captcha_page_cookies.items():
+                    if key not in ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']:
+                        merged_cookies[key] = value
+                        logger.info(f"🔍 DEBUG - Added/updated captcha page cookie: {key} = {value[:50]}...")
+            
+            logger.info(f"🔍 DEBUG - Final merged cookies: {merged_cookies}")
+            captcha_page_cookies = merged_cookies
+            
             if not captcha_images or not instruction:
                 logger.error("❌ No captcha images or instruction found")
                 return "MANUAL_CAPTCHA_REQUIRED"
@@ -291,11 +327,13 @@ class CaptchaHandler:
                 logger.error("❌ Failed to extract Id and Captcha fields from captcha page")
                 return "MANUAL_CAPTCHA_REQUIRED"
             
-            # Use the Id and Captcha from captcha page
+            # Use the Id, Captcha, and __RequestVerificationToken from captcha page
             captcha_page_id = captcha_fields['Id']
             captcha_page_data = captcha_fields['Captcha']
+            captcha_page_token = captcha_fields.get('__RequestVerificationToken', '')
             logger.info(f"✅ Using captcha page Id: {captcha_page_id[:20]}...")
             logger.info(f"✅ Using captcha page data: {captcha_page_data[:20]}...")
+            logger.info(f"✅ Using captcha page token: {captcha_page_token[:20]}...")
             
             # Solve captcha
             selected_image_ids = await self.captcha_solver.solve_bls_image_captcha(captcha_images, image_ids, instruction)
@@ -303,9 +341,17 @@ class CaptchaHandler:
                 logger.error("❌ Failed to solve captcha")
                 return "MANUAL_CAPTCHA_REQUIRED"
             
-            # Submit solution using the correct Id and Captcha from captcha page
+            # Prepare cookies with the captcha page token (REQUIRED for captcha submission!)
+            # Use the fresh cookies from the captcha page (includes aws-waf-token and visitorId_current)
+            submission_cookies = captcha_page_cookies.copy() if captcha_page_cookies else {}
+            if captcha_page_token:
+                submission_cookies['__RequestVerificationToken'] = captcha_page_token
+            
+            logger.info(f"🔍 DEBUG - Final submission cookies: {submission_cookies}")
+            
+            # Submit solution using the correct Id, Captcha, and __RequestVerificationToken from captcha page
             success = await self.captcha_submitter.submit_captcha_solution(
-                captcha_page_id, selected_image_ids, captcha_page_data, None, cookies, proxy_url
+                captcha_page_id, selected_image_ids, captcha_page_data, None, submission_cookies, proxy_url, captcha_url
             )
                         
             if success:
@@ -334,9 +380,18 @@ class CaptchaHandler:
     
     async def _get_captcha_page_content(self, page_url: str, 
                                      cookies: Dict[str, str] = None, proxy_url: str = None,
-                                     form_data: Dict[str, Any] = None, existing_session = None) -> str:
+                                     form_data: Dict[str, Any] = None, existing_session = None) -> tuple[str, dict]:
         """Get captcha page content with WAF bypass handling and retry logic"""
         logger.info("🔄 Using comprehensive WAF bypass for captcha page...")
+        logger.info(f"🔍 DEBUG - _get_captcha_page_content called with URL: {page_url}")
+        logger.info(f"🔍 DEBUG - Cookies parameter: {cookies}")
+        logger.info(f"🔍 DEBUG - Proxy URL: {proxy_url}")
+        logger.info(f"🔍 DEBUG - Form data: {form_data}")
+        logger.info(f"🔍 DEBUG - Existing session: {existing_session}")
+        
+        # DEBUG: Check if this method is actually being called
+        import traceback
+        logger.info(f"🔍 DEBUG - Call stack: {traceback.format_stack()[-3:-1]}")
         
         try:
             # Use the SAME approach as our working test script
@@ -429,9 +484,11 @@ class CaptchaHandler:
                 logger.info(f"🔑 Generated AWS WAF token: {token[:20]}...")
                 
                 logger.info("🌐 Testing with token...")
-                session.headers.update({
-                    "cookie": "aws-waf-token=" + token
-                })
+                # CRITICAL: Set the WAF token as a proper cookie in the session
+                session.cookies.set("aws-waf-token", token)
+                
+                # DEBUG: Check cookies after setting WAF token
+                logger.info(f"🔍 DEBUG - Cookies after setting WAF token: {session.cookies.get_dict()}")
                 
                 solved_response = session.get(page_url, timeout=30)
                 logger.info(f"📡 Solved response: {solved_response.status_code}")
@@ -439,20 +496,113 @@ class CaptchaHandler:
                 logger.info(f"🔍 DEBUG - Response headers: {dict(solved_response.headers)}")
                 logger.info(f"🔍 DEBUG - Response text preview: {solved_response.text[:200]}...")
                 
+                # DEBUG: Check response conditions
+                logger.info(f"🔍 DEBUG - Status code check: {solved_response.status_code == 200}")
+                logger.info(f"🔍 DEBUG - Content length check: {len(solved_response.text) > 100}")
+                logger.info(f"🔍 DEBUG - Both conditions met: {solved_response.status_code == 200 and len(solved_response.text) > 100}")
+                
                 if solved_response.status_code == 200 and len(solved_response.text) > 100:
                     logger.info(f"✅ Retrieved captcha page content: {len(solved_response.text)} characters")
                     logger.info(f"🔍 Captcha content preview: {solved_response.text[:500]}...")
-                    return solved_response.text
+                    
+                    # Extract cookies from the curl_cffi session
+                    session_cookies = {}
+                    
+                    # DEBUG: Check session and cookies attributes
+                    logger.info(f"🔍 DEBUG - Session type: {type(session)}")
+                    logger.info(f"🔍 DEBUG - Has cookies attr: {hasattr(session, 'cookies')}")
+                    
+                    if hasattr(session, 'cookies'):
+                        logger.info(f"🔍 DEBUG - Cookies type: {type(session.cookies)}")
+                        logger.info(f"🔍 DEBUG - Cookies dir: {dir(session.cookies)}")
+                        logger.info(f"🔍 DEBUG - Has get_dict method: {hasattr(session.cookies, 'get_dict')}")
+                        
+                        # Method 1: Use curl_cffi's get_dict() method (recommended by docs)
+                        if hasattr(session.cookies, 'get_dict'):
+                            try:
+                                session_cookies = session.cookies.get_dict()
+                                logger.info(f"🔍 DEBUG - Cookies from get_dict(): {session_cookies}")
+                            except Exception as e:
+                                logger.error(f"❌ Error calling get_dict(): {e}")
+                        
+                        # Method 2: Fallback to manual iteration
+                        if not session_cookies:
+                            logger.info("🔍 DEBUG - Trying manual cookie iteration...")
+                            for cookie in session.cookies:
+                                logger.info(f"🔍 DEBUG - Raw cookie: {cookie}")
+                                logger.info(f"🔍 DEBUG - Cookie name: {getattr(cookie, 'name', 'NO_NAME')}")
+                                logger.info(f"🔍 DEBUG - Cookie value: {getattr(cookie, 'value', 'NO_VALUE')}")
+                                
+                                # Filter out cookie attributes (path, samesite, etc.)
+                                cookie_name = getattr(cookie, 'name', None)
+                                cookie_value = getattr(cookie, 'value', None)
+                                
+                                if cookie_name and cookie_value and cookie_name not in ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']:
+                                    session_cookies[cookie_name] = cookie_value
+                                    logger.info(f"🔍 DEBUG - Added cookie: {cookie_name} = {cookie_value[:50]}...")
+                    
+                    # Method 3: Check response headers for Set-Cookie
+                    if hasattr(solved_response, 'headers'):
+                        set_cookie_headers = solved_response.headers.get('Set-Cookie', '')
+                        if set_cookie_headers:
+                            logger.info(f"🔍 DEBUG - Set-Cookie headers: {set_cookie_headers}")
+                    
+                    logger.info(f"🔍 DEBUG - Final session cookies from captcha page: {session_cookies}")
+                    return solved_response.text, session_cookies
                 else:
                     logger.warning(f"⚠️ Captcha response failed: status={solved_response.status_code}, length={len(solved_response.text)}")
-                    return None
+                    return None, {}
                     
             elif response.status_code == 200 and len(response.text) > 100:
                 logger.info("✅ Already have captcha page (no challenge needed)!")
-                return response.text
+                
+                # Extract cookies from the curl_cffi session
+                session_cookies = {}
+                
+                # DEBUG: Check session and cookies attributes
+                logger.info(f"🔍 DEBUG - Session type (no challenge): {type(session)}")
+                logger.info(f"🔍 DEBUG - Has cookies attr (no challenge): {hasattr(session, 'cookies')}")
+                
+                if hasattr(session, 'cookies'):
+                    logger.info(f"🔍 DEBUG - Cookies type (no challenge): {type(session.cookies)}")
+                    logger.info(f"🔍 DEBUG - Cookies dir (no challenge): {dir(session.cookies)}")
+                    logger.info(f"🔍 DEBUG - Has get_dict method (no challenge): {hasattr(session.cookies, 'get_dict')}")
+                    
+                    # Method 1: Use curl_cffi's get_dict() method (recommended by docs)
+                    if hasattr(session.cookies, 'get_dict'):
+                        try:
+                            session_cookies = session.cookies.get_dict()
+                            logger.info(f"🔍 DEBUG - Cookies from get_dict() (no challenge): {session_cookies}")
+                        except Exception as e:
+                            logger.error(f"❌ Error calling get_dict() (no challenge): {e}")
+                    
+                    # Method 2: Fallback to manual iteration
+                    if not session_cookies:
+                        logger.info("🔍 DEBUG - Trying manual cookie iteration (no challenge)...")
+                        for cookie in session.cookies:
+                            logger.info(f"🔍 DEBUG - Raw cookie (no challenge): {cookie}")
+                            logger.info(f"🔍 DEBUG - Cookie name (no challenge): {getattr(cookie, 'name', 'NO_NAME')}")
+                            logger.info(f"🔍 DEBUG - Cookie value (no challenge): {getattr(cookie, 'value', 'NO_VALUE')}")
+                            
+                            # Filter out cookie attributes (path, samesite, etc.)
+                            cookie_name = getattr(cookie, 'name', None)
+                            cookie_value = getattr(cookie, 'value', None)
+                            
+                            if cookie_name and cookie_value and cookie_name not in ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']:
+                                session_cookies[cookie_name] = cookie_value
+                                logger.info(f"🔍 DEBUG - Added cookie (no challenge): {cookie_name} = {cookie_value[:50]}...")
+                
+                # Method 3: Check response headers for Set-Cookie
+                if hasattr(response, 'headers'):
+                    set_cookie_headers = response.headers.get('Set-Cookie', '')
+                    if set_cookie_headers:
+                        logger.info(f"🔍 DEBUG - Set-Cookie headers (no challenge): {set_cookie_headers}")
+                
+                logger.info(f"🔍 DEBUG - Final session cookies from captcha page (no challenge): {session_cookies}")
+                return response.text, session_cookies
             else:
                 logger.warning(f"⚠️ Unexpected response: status={response.status_code}, length={len(response.text)}")
-                return None
+                return None, {}
             
             # Fallback: Use the comprehensive WAF bypass handler for captcha requests
             from .waf_bypass import WAFBypassHandler
@@ -512,7 +662,8 @@ class CaptchaHandler:
                 if bypass_content and len(bypass_content) > 100:
                     logger.info(f"✅ Retrieved captcha page content: {len(bypass_content)} characters")
                     logger.info(f"🔍 Captcha content preview: {bypass_content[:500]}...")
-                    return bypass_content
+                    # For fallback, we don't have fresh cookies, so return empty dict
+                    return bypass_content, {}
                 else:
                     logger.warning("⚠️ Bypass content too short or empty")
             else:
@@ -550,7 +701,8 @@ class CaptchaHandler:
                         if response.status == 200:
                             content = await response.text()
                             logger.info(f"✅ Successfully retrieved captcha page content: {len(content)} characters")
-                            return content
+                            # For fallback, we don't have fresh cookies, so return empty dict
+                            return content, {}
                         elif response.status == 202:
                             logger.info("🔍 AWS WAF challenge detected on captcha URL!")
                             challenge_content = await response.text()
@@ -604,7 +756,8 @@ class CaptchaHandler:
                                             if retry_response.status == 200:
                                                 content = await retry_response.text()
                                                 logger.info(f"✅ Successfully retrieved captcha page content after WAF bypass: {len(content)} characters")
-                                                return content
+                                                # For fallback, we don't have fresh cookies, so return empty dict
+                                                return content, {}
                                             else:
                                                 logger.warning(f"⚠️ Retry failed with status: {retry_response.status}")
                                     else:
@@ -629,4 +782,4 @@ class CaptchaHandler:
                     await asyncio.sleep(2)
         
         logger.error(f"❌ Failed to get captcha page content after {max_retries} attempts")
-        return ""
+        return "", {}
