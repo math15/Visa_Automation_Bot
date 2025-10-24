@@ -12,8 +12,7 @@ import {
   XCircle, 
   Loader2, 
   ExternalLink,
-  Wifi,
-  WifiOff
+  Wifi
 } from 'lucide-react';
 
 export default function BLSTestPage() {

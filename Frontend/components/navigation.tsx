@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Settings, Shield, Globe, Home, UserPlus, TestTube } from 'lucide-react';
+import { Settings, Shield, Globe, Home, UserPlus, TestTube, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Home', href: '/', icon: Home },
+  { name: 'Account Management', href: '/account-management', icon: Users },
   { name: 'Tesla Config', href: '/tesla-config', icon: Settings },
   { name: 'Create Account', href: '/tesla-config/create-account', icon: UserPlus },
   { name: 'Proxy Management', href: '/proxy-management', icon: Globe },

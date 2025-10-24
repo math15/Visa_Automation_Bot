@@ -978,5 +978,16 @@ def root():
 
 if __name__ == "__main__":
     import uvicorn
+    from database.config import create_tables
+    
     logger.info("🚀 Starting Booking Visa Bot Backend...")
+    
+    # Create database tables on startup
+    try:
+        create_tables()
+        logger.info("✅ Database tables created/verified successfully")
+    except Exception as e:
+        logger.error(f"❌ Error creating database tables: {e}")
+        raise
+    
     uvicorn.run(app, host="0.0.0.0", port=8000)

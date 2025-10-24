@@ -17,12 +17,10 @@ import {
   Clock,
   Target,
   TrendingUp,
-  Activity,
   Star,
   Award,
   Rocket,
   Lock,
-  Smartphone,
   Monitor,
   UserPlus,
   TestTube

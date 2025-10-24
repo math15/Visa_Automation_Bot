@@ -278,7 +278,7 @@ export default function ProxyManagementPage() {
       
     } catch (error) {
       console.error('💥 Error loading proxies:', error);
-      setMessage({type: 'error', text: `Failed to load proxies: ${error.message}`});
+      setMessage({type: 'error', text: `Failed to load proxies: ${error instanceof Error ? error.message : 'Unknown error'}`});
     } finally {
       setIsLoading(false);
     }

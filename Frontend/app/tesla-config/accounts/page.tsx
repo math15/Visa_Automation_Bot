@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   Users, 
@@ -14,7 +13,6 @@ import {
   Edit, 
   Trash2, 
   Play, 
-  Pause, 
   CheckCircle, 
   XCircle, 
   Clock, 
@@ -54,13 +52,11 @@ export default function TeslaAccountsPage() {
     last_name: '',
     passport_number: '',
     phone: '',
-    status: 'pending' as const,
+    status: 'pending' as TeslaAccount['status'],
     notes: ''
   });
   const [bulkImport, setBulkImport] = useState('');
   const [runningAccounts, setRunningAccounts] = useState<number[]>([]);
-
-  const API_BASE = 'http://localhost:8000/api';
 
   useEffect(() => {
     fetchAccounts();
@@ -163,7 +159,7 @@ export default function TeslaAccountsPage() {
       last_name: '',
       passport_number: '',
       phone: '',
-      status: 'pending',
+      status: 'pending' as TeslaAccount['status'],
       notes: ''
     });
   };
@@ -182,7 +178,7 @@ export default function TeslaAccountsPage() {
         last_name: parts[3] || '',
         passport_number: parts[4] || '',
         phone: parts[5] || '',
-        status: 'pending' as const,
+        status: 'pending' as TeslaAccount['status'],
         created_at: new Date().toISOString(),
         appointments_count: 0,
         success_rate: 0,

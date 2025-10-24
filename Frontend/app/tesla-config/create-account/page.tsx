@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/toast';
 import { 
   User, 
   Mail, 
@@ -20,7 +21,8 @@ import {
   Eye,
   EyeOff,
   Key,
-  UserPlus
+  UserPlus,
+  Save
 } from 'lucide-react';
 
 interface FormData {
@@ -64,6 +66,10 @@ interface ValidationErrors {
 }
 
 export default function CreateAccountPage() {
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editAccountId, setEditAccountId] = useState<number | null>(null);
+  const { addToast } = useToast();
+  
   const [formData, setFormData] = useState<FormData>({
     FirstName: '',
     LastName: '',
@@ -91,7 +97,64 @@ export default function CreateAccountPage() {
 
   // Auto-generate credentials on component mount
   React.useEffect(() => {
-    generateCredentials();
+    // Check for edit mode from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const editParam = urlParams.get('edit');
+    
+    if (editParam === 'true') {
+      setIsEditMode(true);
+      const id = urlParams.get('id');
+      if (id) {
+        setEditAccountId(parseInt(id));
+      }
+      
+      // Pre-populate form with ALL URL parameters
+      setFormData(prev => ({
+        ...prev,
+        // Personal Information
+        FirstName: urlParams.get('first_name') || '',
+        LastName: urlParams.get('last_name') || '',
+        FamilyName: urlParams.get('family_name') || '',
+        DateOfBirth: urlParams.get('date_of_birth') || '',
+        Gender: urlParams.get('gender') || 'Male',
+        MaritalStatus: urlParams.get('marital_status') || 'Single',
+        
+        // Passport Information
+        PassportNumber: urlParams.get('passport_number') || '',
+        PassportType: urlParams.get('passport_type') || 'Ordinary',
+        PassportIssueDate: urlParams.get('passport_issue_date') || '',
+        PassportExpiryDate: urlParams.get('passport_expiry_date') || '',
+        PassportIssuePlace: urlParams.get('passport_issue_place') || 'Algiers',
+        PassportIssueCountry: urlParams.get('passport_issue_country') || 'Algeria',
+        
+        // Contact Information
+        Email: urlParams.get('email') || '',
+        Mobile: urlParams.get('mobile') || '',
+        PhoneCountryCode: urlParams.get('phone_country_code') || '+213',
+        
+        // Location Information
+        BirthCountry: urlParams.get('birth_country') || 'Algeria',
+        CountryOfResidence: urlParams.get('country_of_residence') || 'Algeria',
+        
+        // Additional Information
+        NumberOfMembers: parseInt(urlParams.get('number_of_members') || '1'),
+        Relationship: urlParams.get('relationship') || 'Self',
+        PrimaryApplicant: urlParams.get('primary_applicant') === 'true',
+        
+        // Account Credentials
+        Password: urlParams.get('password') || '',
+        ConfirmPassword: urlParams.get('password') || '',
+      }));
+      
+      addToast({
+        type: 'info',
+        title: 'Edit Mode',
+        description: 'You are editing an existing account. Make your changes and save.'
+      });
+    } else {
+      // Only auto-generate credentials for new accounts
+      generateCredentials();
+    }
   }, []);
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -219,14 +282,26 @@ export default function CreateAccountPage() {
 
       console.log('Submitting to API:', apiData);
 
-      // Call enhanced BLS account creation API
-      const response = await fetch('http://localhost:8000/api/enhanced-bls/create-real-account', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apiData),
-      });
+      let response;
+      if (isEditMode && editAccountId) {
+        // Update existing account
+        response = await fetch(`http://localhost:8000/api/enhanced-bls/accounts/${editAccountId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(apiData),
+        });
+      } else {
+        // Create new account
+        response = await fetch('http://localhost:8000/api/enhanced-bls/accounts/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(apiData),
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -234,58 +309,58 @@ export default function CreateAccountPage() {
       }
 
       const result = await response.json();
-      console.log('Real BLS account created successfully:', result);
-      console.log('Result status:', result.status);
-      console.log('Result success:', result.success);
-      console.log('Result captcha_id:', result.captcha_id);
+      console.log('Account saved successfully:', result);
       
-      // Check if captcha solving is required
-      if (result.status === 'captcha_required' && result.captcha_data_param) {
-        console.log('Captcha required - opening popup with data param:', result.captcha_data_param);
-        // Show captcha solving interface
-        await handleCaptchaSolving('', result.captcha_data_param);
-        return;
+      // Show success message
+      if (isEditMode) {
+        addToast({
+          type: 'success',
+          title: 'Account Updated',
+          description: 'Account has been successfully updated!'
+        });
+        
+        // Redirect back to account management
+        setTimeout(() => {
+          window.location.href = '/account-management';
+        }, 2000);
+      } else {
+        addToast({
+          type: 'success',
+          title: 'Account Created',
+          description: 'Account has been stored in the system. You can now create a BLS account for it from the Account Management page.'
+        });
+        
+        // Reset form for new account
+        setFormData({
+          FirstName: '',
+          LastName: '',
+          FamilyName: '',
+          DateOfBirth: '',
+          Gender: 'Male',
+          PassportNumber: '',
+          PassportType: 'Ordinary',
+          PassportIssueDate: '',
+          PassportExpiryDate: '',
+          PassportIssuePlace: 'Algiers',
+          PassportIssueCountry: 'Algeria',
+          Email: '',
+          Mobile: '',
+          PhoneCountryCode: '+213',
+          BirthCountry: 'Algeria',
+          CountryOfResidence: 'Algeria',
+          MaritalStatus: 'Single',
+          NumberOfMembers: 1,
+          Relationship: 'Self',
+          PrimaryApplicant: true,
+          Password: '',
+          ConfirmPassword: ''
+        });
+        
+        // Regenerate credentials for new account
+        generateCredentials();
       }
-      
-      console.log('No captcha required - showing success alert');
-      // Show success message with real email info
-      alert(`Real BLS Account Created Successfully!
-      
-Email: ${result.email}
-Account ID: ${result.account_id}
-Status: ${result.status}
-Message: ${result.message}
-
-The account has been created on the actual BLS website with real email verification!`);
-      
-      // Reset form
-      setFormData({
-        FirstName: '',
-        LastName: '',
-        FamilyName: '',
-        DateOfBirth: '',
-        Gender: 'Male',
-        PassportNumber: '',
-        PassportType: 'Ordinary',
-        PassportIssueDate: '',
-        PassportExpiryDate: '',
-        PassportIssuePlace: 'Algiers',
-        PassportIssueCountry: 'Algeria',
-        Email: '',
-        Mobile: '',
-        PhoneCountryCode: '+213',
-        BirthCountry: 'Algeria',
-        CountryOfResidence: 'Algeria',
-        MaritalStatus: 'Single',
-        NumberOfMembers: 1,
-        Relationship: 'Self',
-        PrimaryApplicant: true,
-        Password: '',
-        ConfirmPassword: ''
-      });
-      
     } catch (error) {
-      console.error('Error creating account:', error);
+      console.error('Error saving account:', error);
       
       // Handle specific validation errors
       if (error instanceof Error) {
@@ -298,37 +373,24 @@ The account has been created on the actual BLS website with real email verificat
         } else if (error.message.includes('Passport Number should Start with 2 Alphabet')) {
           setErrors(prev => ({ ...prev, PassportNumber: 'Passport Number should Start with 2 Alphabet followed with minimum 7 digit' }));
         } else {
-          alert(`Error creating account: ${error.message}`);
+          addToast({
+            type: 'error',
+            title: 'Save Failed',
+            description: error.message
+          });
         }
       } else {
-        alert('Error creating account. Please try again.');
+        addToast({
+          type: 'error',
+          title: 'Save Error',
+          description: 'Failed to save account. Please try again.'
+        });
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleCaptchaSolving = async (_captchaSolverUrl: string, captchaDataParam: string) => {
-    console.log('Opening captcha popup window with data param:', captchaDataParam);
-    
-    // Open captcha popup window directly using the correct data parameter
-    const captchaUrl = `https://algeria.blsspainglobal.com/dza/CaptchaPublic/GenerateCaptcha?data=${captchaDataParam}`;
-    
-    // Open in small popup window
-    const popup = window.open(
-      captchaUrl,
-      'captcha-solver',
-      'width=600,height=500,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no'
-    );
-    
-    if (popup) {
-      popup.focus();
-      console.log('Captcha popup window opened with URL:', captchaUrl);
-    } else {
-      console.error('Failed to open captcha popup window');
-      alert('Please allow popups for this site to solve the captcha');
-    }
-  };
 
 
   const generateSampleData = () => {
@@ -450,13 +512,21 @@ Please check if the backend is running on http://localhost:8000`);
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Create BLS Account</h1>
+        <h1 className="text-3xl font-bold mb-2">
+          {isEditMode ? 'Edit Account' : 'Create Account'}
+        </h1>
         <p className="text-muted-foreground">
-          Create a new account for BLS Algeria visa appointment booking with proper validation
+          {isEditMode 
+            ? 'Edit the account information below. Changes will be saved to the system.'
+            : 'Create a new account in the system. You can create BLS accounts for it later from the Account Management page.'
+          }
         </p>
         <div className="mt-2">
           <Badge variant="outline" className="text-xs">
-            BLS Algeria: https://algeria.blsspainglobal.com/
+            {isEditMode 
+              ? 'Edit Mode: Make changes and save'
+              : 'Step 1: Create Account → Step 2: Create BLS Account'
+            }
           </Badge>
         </div>
       </div>
@@ -959,12 +1029,12 @@ Please check if the backend is running on http://localhost:8000`);
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating Real Account...
+                  {isEditMode ? 'Saving Changes...' : 'Creating Account...'}
                 </>
               ) : (
                 <>
-                  <UserPlus className="h-4 w-4" />
-                  Create Real BLS Account
+                  {isEditMode ? <Save className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                  {isEditMode ? 'Save Changes' : 'Create Account'}
                 </>
               )}
             </Button>

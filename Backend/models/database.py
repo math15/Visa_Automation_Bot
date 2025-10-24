@@ -46,7 +46,66 @@ class Proxy(Base):
     last_validated = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class Account(Base):
+    """Base account model for storing account information before BLS creation"""
+    __tablename__ = "accounts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Personal Information
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    family_name = Column(String(100), nullable=True)
+    date_of_birth = Column(String(10), nullable=False)  # YYYY-MM-DD format
+    gender = Column(String(10), default="Male")
+    marital_status = Column(String(20), default="Single")
+    
+    # Passport Information
+    passport_number = Column(String(50), nullable=False, unique=True)
+    passport_type = Column(String(20), default="Ordinary")
+    passport_issue_date = Column(String(10), nullable=False)  # YYYY-MM-DD format
+    passport_expiry_date = Column(String(10), nullable=False)  # YYYY-MM-DD format
+    passport_issue_place = Column(String(100), nullable=True)
+    passport_issue_country = Column(String(100), nullable=True)
+    
+    # Contact Information
+    email = Column(String(255), nullable=False, unique=True)
+    mobile = Column(String(20), nullable=False)
+    phone_country_code = Column(String(10), default="+213")
+    
+    # Location Information
+    birth_country = Column(String(100), nullable=True)
+    country_of_residence = Column(String(100), nullable=True)
+    
+    # Additional Information
+    number_of_members = Column(Integer, default=1)
+    relationship = Column(String(20), default="Self")
+    primary_applicant = Column(Boolean, default=True)
+    
+    # Account Credentials
+    password = Column(String(255), nullable=False)
+    
+    # Account Status
+    status = Column(String(20), default="created")  # created, bls_creating, bls_created, bls_failed, inactive
+    is_enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # BLS Account Status
+    bls_status = Column(String(20), default="not_created")  # not_created, creating, created, failed
+    bls_username = Column(String(255), nullable=True)
+    bls_password = Column(String(255), nullable=True)
+    bls_created_at = Column(DateTime, nullable=True)
+    bls_error_message = Column(Text, nullable=True)
+    
+    # Processing Information
+    proxy_id = Column(Integer, nullable=True)
+    processing_attempts = Column(Integer, default=0)
+    last_processing_attempt = Column(DateTime, nullable=True)
+    last_activity = Column(DateTime, nullable=True)
+
 class BLSAccount(Base):
+    """Legacy BLS account model - keeping for backward compatibility"""
     __tablename__ = "bls_accounts"
     
     id = Column(Integer, primary_key=True, index=True)

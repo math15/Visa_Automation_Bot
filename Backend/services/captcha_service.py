@@ -347,10 +347,9 @@ class CaptchaService:
                                 text_solutions = solution_data.get("text", [])
                                 
                                 if text_solutions:
-                                    # Join all solutions (BLS captcha might have multiple images)
-                                    combined_solution = "".join(text_solutions)
-                                    logger.info(f"✅ NoCaptchaAI solved immediately: {combined_solution}")
-                                    return combined_solution
+                                    # Return the array directly instead of joining
+                                    logger.info(f"✅ NoCaptchaAI solved immediately: {text_solutions}")
+                                    return text_solutions
                                 else:
                                     logger.error("❌ No solution text in immediate response")
                                     return None

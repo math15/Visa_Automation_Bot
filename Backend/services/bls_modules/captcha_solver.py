@@ -55,7 +55,7 @@ class CaptchaSolver:
             logger.error(f"❌ Error solving BLS image captcha: {e}")
             return None
     
-    def _parse_solution(self, solution: str, image_ids: List[str], instruction: str) -> List[str]:
+    def _parse_solution(self, solution: List[str], image_ids: List[str], instruction: str) -> List[str]:
         """Parse NoCaptchaAI solution and match with image IDs"""
         try:
             # Extract target number from instruction
@@ -66,45 +66,13 @@ class CaptchaSolver:
             
             target_number = target_match.group(1)
             logger.info(f"🎯 Target number from instruction: {target_number}")
-            
-            # Parse solution string (e.g., "99944819810919819850619896")
-            # Split into individual numbers
-            solution_numbers = []
-            i = 0
-            while i < len(solution):
-                # Try 3-digit numbers first
-                if i + 3 <= len(solution):
-                    num = solution[i:i+3]
-                    if num.isdigit():
-                        solution_numbers.append(num)
-                        i += 3
-                        continue
-                
-                # Try 2-digit numbers
-                if i + 2 <= len(solution):
-                    num = solution[i:i+2]
-                    if num.isdigit():
-                        solution_numbers.append(num)
-                        i += 2
-                        continue
-                
-                # Try 1-digit numbers
-                if i + 1 <= len(solution):
-                    num = solution[i:i+1]
-                    if num.isdigit():
-                        solution_numbers.append(num)
-                        i += 1
-                        continue
-                
-                i += 1
-            
-            logger.info(f"🎯 Parsed image values: {solution_numbers}")
+            logger.info(f"🎯 AI solution: {solution}")
             logger.info(f"🎯 Available image IDs: {image_ids}")
             
-            # Match solution numbers with image IDs
+            # Solution is now a list of strings, not a concatenated string
             selected_image_ids = []
             
-            for i, value in enumerate(solution_numbers):
+            for i, value in enumerate(solution):
                 if i >= len(image_ids):
                     logger.warning(f"⚠️ Solution has more values than available images")
                     break
@@ -115,6 +83,7 @@ class CaptchaSolver:
                 else:
                     logger.info(f"🎯 Skipped image {i+1}: value '{value}' does not match target '{target_number}'")
             
+            logger.info(f"🎯 Final selected image IDs: {selected_image_ids}")
             return selected_image_ids
             
         except Exception as e:
