@@ -52,30 +52,36 @@ class Account(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     
-    # Personal Information
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
-    family_name = Column(String(100), nullable=True)
+    # Personal Information (BLS format)
+    sur_name = Column(String(100), nullable=True)  # BLS: SurName (Family Name) - optional
+    first_name = Column(String(100), nullable=False)  # BLS: FirstName (Given Name) - required
+    last_name = Column(String(100), nullable=False)  # BLS: LastName - required
+    family_name = Column(String(100), nullable=True)  # Legacy field, kept for compatibility
     date_of_birth = Column(String(10), nullable=False)  # YYYY-MM-DD format
     gender = Column(String(10), default="Male")
     marital_status = Column(String(20), default="Single")
     
-    # Passport Information
-    passport_number = Column(String(50), nullable=False, unique=True)
-    passport_type = Column(String(20), default="Ordinary")
+    # Passport Information (BLS format)
+    passport_number = Column(String(50), nullable=False, unique=True)  # BLS: any format
+    passport_type = Column(String(255), default="Ordinary")  # BLS: GUID or name
+    passport_type_guid = Column(String(255), nullable=True)  # BLS: PassportType GUID
     passport_issue_date = Column(String(10), nullable=False)  # YYYY-MM-DD format
     passport_expiry_date = Column(String(10), nullable=False)  # YYYY-MM-DD format
-    passport_issue_place = Column(String(100), nullable=True)
-    passport_issue_country = Column(String(100), nullable=True)
+    passport_issue_place = Column(String(100), nullable=False)  # BLS: IssuePlace - required!
+    passport_issue_country = Column(String(255), nullable=True)  # BLS: BirthCountry (name)
+    passport_issue_country_guid = Column(String(255), nullable=True)  # BLS: BirthCountry GUID
     
     # Contact Information
     email = Column(String(255), nullable=False, unique=True)
     mobile = Column(String(20), nullable=False)
     phone_country_code = Column(String(10), default="+213")
+    country_code = Column(String(10), default="+213")  # BLS: CountryCode field
     
-    # Location Information
-    birth_country = Column(String(100), nullable=True)
-    country_of_residence = Column(String(100), nullable=True)
+    # Location Information (BLS format)
+    birth_country = Column(String(255), nullable=True)  # BLS: BirthCountry (name)
+    birth_country_guid = Column(String(255), nullable=True)  # BLS: BirthCountry GUID
+    country_of_residence = Column(String(255), nullable=True)  # BLS: CountryOfResidence (name)
+    country_of_residence_guid = Column(String(255), nullable=True)  # BLS: CountryOfResidence GUID
     
     # Additional Information
     number_of_members = Column(Integer, default=1)

@@ -26,10 +26,11 @@ import {
 } from 'lucide-react';
 
 interface FormData {
-  // Personal Information
-  FirstName: string;
-  LastName: string;
-  FamilyName: string;
+  // Personal Information (BLS format)
+  SurName: string;  // BLS: SurName (Family Name) - optional
+  FirstName: string;  // BLS: FirstName (Given Name) - required
+  LastName: string;  // BLS: LastName - required
+  FamilyName: string;  // Legacy field
   DateOfBirth: string;
   Gender: string;
   
@@ -71,16 +72,17 @@ export default function CreateAccountPage() {
   const { addToast } = useToast();
   
   const [formData, setFormData] = useState<FormData>({
-    FirstName: '',
-    LastName: '',
-    FamilyName: '',
+    SurName: '',  // BLS: SurName (Family Name)
+    FirstName: '',  // BLS: FirstName (Given Name)
+    LastName: '',  // BLS: LastName
+    FamilyName: '',  // Legacy
     DateOfBirth: '',
     Gender: 'Male',
     PassportNumber: '',
     PassportType: 'Ordinary',
     PassportIssueDate: '',
     PassportExpiryDate: '',
-    PassportIssuePlace: 'Algiers',
+    PassportIssuePlace: '',  // BLS: Required! Changed from 'Algiers'
     PassportIssueCountry: 'Algeria',
     Email: '',
     Mobile: '',
@@ -111,7 +113,8 @@ export default function CreateAccountPage() {
       // Pre-populate form with ALL URL parameters
       setFormData(prev => ({
         ...prev,
-        // Personal Information
+        // Personal Information (BLS format)
+        SurName: urlParams.get('sur_name') || '',  // BLS: SurName
         FirstName: urlParams.get('first_name') || '',
         LastName: urlParams.get('last_name') || '',
         FamilyName: urlParams.get('family_name') || '',
@@ -176,10 +179,11 @@ export default function CreateAccountPage() {
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
 
-    // Required field validation
+    // Required field validation (BLS exact requirements)
     const requiredFields: (keyof FormData)[] = [
       'FirstName', 'LastName', 'DateOfBirth', 'PassportNumber',
-      'PassportIssueDate', 'PassportExpiryDate', 'Email', 'Mobile', 'Password'
+      'PassportIssueDate', 'PassportExpiryDate', 'PassportIssuePlace',  // BLS requires IssuePlace!
+      'Email', 'Mobile', 'Password'
     ];
 
     requiredFields.forEach(field => {
@@ -197,11 +201,10 @@ export default function CreateAccountPage() {
       }
     }
 
-    // Passport validation (BLS specific - exactly 9 digits only)
-    if (formData.PassportNumber) {
-      if (!/^\d{9}$/.test(formData.PassportNumber)) {
-        newErrors.PassportNumber = 'Passport Number must be exactly 9 digits';
-      }
+    // Passport validation (BLS accepts ANY format - no strict validation!)
+    // BLS does NOT enforce specific passport format
+    if (formData.PassportNumber && formData.PassportNumber.length < 6) {
+      newErrors.PassportNumber = 'Passport Number must be at least 6 characters';
     }
 
     // Email validation
@@ -255,25 +258,26 @@ export default function CreateAccountPage() {
     setIsSubmitting(true);
     
     try {
-      // Prepare data for backend API (dates in YYYY-MM-DD format)
+      // Prepare data for backend API (BLS format, dates in YYYY-MM-DD)
       const apiData = {
+        sur_name: formData.SurName || null,  // BLS: SurName (optional)
         first_name: formData.FirstName,
         last_name: formData.LastName,
-        family_name: formData.FamilyName,
-        date_of_birth: formData.DateOfBirth, // Already in YYYY-MM-DD format
+        family_name: formData.FamilyName || null,
+        date_of_birth: formData.DateOfBirth,
         gender: formData.Gender,
         marital_status: formData.MaritalStatus,
         passport_number: formData.PassportNumber,
         passport_type: formData.PassportType,
-        passport_issue_date: formData.PassportIssueDate, // Already in YYYY-MM-DD format
-        passport_expiry_date: formData.PassportExpiryDate, // Already in YYYY-MM-DD format
-        passport_issue_place: formData.PassportIssuePlace,
-        passport_issue_country: formData.PassportIssueCountry,
+        passport_issue_date: formData.PassportIssueDate,
+        passport_expiry_date: formData.PassportExpiryDate,
+        passport_issue_place: formData.PassportIssuePlace,  // BLS: Required!
+        passport_issue_country: formData.PassportIssueCountry || null,
         email: formData.Email,
         mobile: formData.Mobile,
         phone_country_code: formData.PhoneCountryCode,
-        birth_country: formData.BirthCountry,
-        country_of_residence: formData.CountryOfResidence,
+        birth_country: formData.BirthCountry || null,
+        country_of_residence: formData.CountryOfResidence || null,
         number_of_members: formData.NumberOfMembers,
         relationship: formData.Relationship,
         primary_applicant: formData.PrimaryApplicant,
@@ -332,6 +336,7 @@ export default function CreateAccountPage() {
         
         // Reset form for new account
         setFormData({
+          SurName: '',  // BLS: SurName field
           FirstName: '',
           LastName: '',
           FamilyName: '',
@@ -341,7 +346,7 @@ export default function CreateAccountPage() {
           PassportType: 'Ordinary',
           PassportIssueDate: '',
           PassportExpiryDate: '',
-          PassportIssuePlace: 'Algiers',
+          PassportIssuePlace: '',  // Required field - start empty
           PassportIssueCountry: 'Algeria',
           Email: '',
           Mobile: '',
@@ -394,20 +399,25 @@ export default function CreateAccountPage() {
 
 
   const generateSampleData = () => {
-    const sampleData: Partial<FormData> = {
-      FirstName: 'Ahmed',
-      LastName: 'Benali',
-      FamilyName: 'Benali',
+    // Generate complete sample data with all required fields
+    const timestamp = Date.now();
+    const sampleEmail = `ahmed.benali${timestamp}@example.com`;
+    
+    const sampleData: FormData = {
+      SurName: 'Benali',  // BLS: SurName (Family Name)
+      FirstName: 'Ahmed',  // BLS: FirstName (Given Name)
+      LastName: 'Benali',  // BLS: LastName
+      FamilyName: 'Benali',  // Legacy
       DateOfBirth: '1990-05-15',
       Gender: 'Male',
       PassportNumber: '123456789',
       PassportType: 'Ordinary',
       PassportIssueDate: '2020-01-15',
       PassportExpiryDate: '2030-01-15',
-      PassportIssuePlace: 'Algiers',
+      PassportIssuePlace: 'Algiers',  // BLS: Required!
       PassportIssueCountry: 'Algeria',
-      Email: 'ahmed.benali@example.com',
-      Mobile: '123456789',
+      Email: sampleEmail,  // Unique email
+      Mobile: '555123456',  // Valid format (no leading 0, 8-10 digits)
       PhoneCountryCode: '+213',
       BirthCountry: 'Algeria',
       CountryOfResidence: 'Algeria',
@@ -415,11 +425,11 @@ export default function CreateAccountPage() {
       NumberOfMembers: 1,
       Relationship: 'Self',
       PrimaryApplicant: true,
-      Password: 'SecurePass123',
-      ConfirmPassword: 'SecurePass123'
+      Password: 'SecurePass123!',
+      ConfirmPassword: 'SecurePass123!'
     };
     
-    setFormData(prev => ({ ...prev, ...sampleData }));
+    setFormData(sampleData);  // Replace entire form data
   };
 
   const generateEmail = () => {
@@ -546,7 +556,20 @@ Please check if the backend is running on http://localhost:8000`);
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="FirstName">First Name *</Label>
+                <Label htmlFor="SurName">Surname (Family Name)</Label>
+                <Input
+                  id="SurName"
+                  value={formData.SurName}
+                  onChange={(e) => handleInputChange('SurName', e.target.value)}
+                  placeholder="Optional - as per BLS form"
+                />
+                <p className="text-xs text-muted-foreground">
+                  BLS: SurName field (optional)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="FirstName">First Name (Given Name) *</Label>
                 <Input
                   id="FirstName"
                   value={formData.FirstName}
@@ -559,6 +582,9 @@ Please check if the backend is running on http://localhost:8000`);
                     {errors.FirstName}
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  BLS: FirstName (required)
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -575,14 +601,18 @@ Please check if the backend is running on http://localhost:8000`);
                     {errors.LastName}
                   </p>
                 )}
+                <p className="text-xs text-muted-foreground">
+                  BLS: LastName (required)
+                </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="FamilyName">Family Name</Label>
+                <Label htmlFor="FamilyName">Family Name (Legacy)</Label>
                 <Input
                   id="FamilyName"
                   value={formData.FamilyName}
                   onChange={(e) => handleInputChange('FamilyName', e.target.value)}
+                  placeholder="For backward compatibility"
                 />
               </div>
 
@@ -666,7 +696,7 @@ Please check if the backend is running on http://localhost:8000`);
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Format: Exactly 9 digits (e.g., 123456789)
+                  BLS accepts any format (min 6 characters)
                 </p>
               </div>
 
@@ -725,12 +755,23 @@ Please check if the backend is running on http://localhost:8000`);
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="PassportIssuePlace">Issue Place</Label>
+                <Label htmlFor="PassportIssuePlace">Passport Issue Place *</Label>
                 <Input
                   id="PassportIssuePlace"
                   value={formData.PassportIssuePlace}
                   onChange={(e) => handleInputChange('PassportIssuePlace', e.target.value)}
+                  placeholder="e.g., Algiers"
+                  className={errors.PassportIssuePlace ? 'border-red-500' : ''}
                 />
+                {errors.PassportIssuePlace && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {errors.PassportIssuePlace}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  BLS: IssuePlace is REQUIRED!
+                </p>
               </div>
 
               <div className="space-y-2">

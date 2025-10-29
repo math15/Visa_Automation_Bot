@@ -74,12 +74,146 @@ class BLSAccountCreator:
             captcha_solution = None
             if captcha_info:
                 logger.info(f"🎯 Captcha detected: {captcha_info['type']}")
+                # Use browser-based solving (RECOMMENDED - bypasses all detection)
                 captcha_solution = await self.captcha_handler.solve_captcha(
-                    captcha_info, form_data, proxy_url, registration_page, session_cookies
+                    captcha_info=captcha_info,
+                    form_data=form_data,
+                    proxy_url=proxy_url,
+                    registration_page=registration_page,
+                    session_cookies=session_cookies,
+                    use_browser=True,    # Use browser-based solving (REQUIRED!)
+                    headless=False,      # Show browser window for debugging/manual solving
+                    manual_mode=True     # Manual solving - user clicks images and submits
                 )
                 logger.info(f"🔍 Captcha solution result: {captcha_solution}")
                 
-                if captcha_solution == "MANUAL_CAPTCHA_REQUIRED":
+                # Handle dictionary response (new format with captcha_token)
+                if isinstance(captcha_solution, dict):
+                    if captcha_solution.get("success") and captcha_solution.get("status") == "CAPTCHA_SOLVED":
+                        logger.info("✅ Browser-based captcha solved successfully!")
+                        captcha_token = captcha_solution.get('captcha_token')
+                        captcha_id_from_solution = captcha_solution.get('captcha_id')
+                        logger.info(f"🔑 Captcha token: {captcha_token[:50] if captcha_token else 'N/A'}...")
+                        logger.info(f"🔑 Captcha ID: {captcha_id_from_solution[:50] if captcha_id_from_solution else 'N/A'}...")
+                        
+                        # Step 6: Send OTP request with captcha tokens
+                        logger.info("📧 Step 6: Sending OTP request to user's email...")
+                        from .otp_handler import OTPHandler
+                        otp_handler = OTPHandler()
+                        
+                        # Prepare user data for OTP request (from account_data)
+                        otp_form_data = {
+                            'SurName': account_data.family_name or '',
+                            'FirstName': account_data.first_name,
+                            'LastName': account_data.last_name,
+                            'DateOfBirth': account_data.date_of_birth.strftime('%Y-%m-%d') if hasattr(account_data.date_of_birth, 'strftime') else str(account_data.date_of_birth),
+                            'PassportNumber': account_data.passport_number,
+                            'PassportIssueDate': account_data.passport_issue_date.strftime('%Y-%m-%d') if hasattr(account_data.passport_issue_date, 'strftime') else str(account_data.passport_issue_date),
+                            'PassportExpiryDate': account_data.passport_expiry_date.strftime('%Y-%m-%d') if hasattr(account_data.passport_expiry_date, 'strftime') else str(account_data.passport_expiry_date),
+                            'BirthCountry': account_data.birth_country or '',
+                            'PassportType': account_data.passport_type or '',
+                            'IssuePlace': account_data.passport_issue_place or '',
+                            'CountryOfResidence': account_data.country_of_residence or '',
+                            'CountryCode': account_data.phone_country_code or '+213',
+                            'Mobile': account_data.mobile,
+                            'Email': real_email,
+                            'SecurityCode': form_data.get('SecurityCode', ''),
+                        }
+                        
+                        # Get antiforgery token
+                        antiforgery_token = form_data.get('__RequestVerificationToken', '')
+                        
+                        # Send OTP request
+                        otp_result = await otp_handler.send_otp_request(
+                            form_data=otp_form_data,
+                            captcha_token=captcha_token,
+                            captcha_id=captcha_id_from_solution,
+                            antiforgery_token=antiforgery_token,
+                            session_cookies=session_cookies,
+                            proxy_url=proxy_url
+                        )
+                        
+                        if not otp_result.get('success'):
+                            logger.error(f"❌ Failed to send OTP: {otp_result.get('error')}")
+                            return BLSAccountCreationResult(
+                                success=False,
+                                status="error",
+                                error_message=f"Failed to send OTP: {otp_result.get('error')}"
+                            )
+                        
+                        logger.info(f"✅ OTP sent successfully to {real_email}")
+                        logger.info(f"🔐 Encrypted Email: {otp_result.get('encryptEmail', 'N/A')[:50]}...")
+                        logger.info(f"🔐 Encrypted Mobile: {otp_result.get('encryptMobile', 'N/A')[:50]}...")
+                        logger.info(f"🔐 Security Code: {otp_result.get('securityCode', 'N/A')[:50]}...")
+                        
+                        # Step 7: Wait for OTP from email
+                        logger.info("📧 Step 7: Waiting for OTP from email...")
+                        from services.email_service import RealEmailService
+                        email_service = RealEmailService()
+                        
+                        # Wait for OTP (60 seconds timeout)
+                        otp_code = await email_service.wait_for_otp(real_email, timeout=60)
+                        
+                        if not otp_code:
+                            logger.error("❌ Failed to retrieve OTP from email")
+                            return BLSAccountCreationResult(
+                                success=False,
+                                status="error",
+                                error_message="Failed to retrieve OTP from email"
+                            )
+                        
+                        logger.info(f"✅ OTP retrieved: {otp_code}")
+                        
+                        # Step 8: Final registration with OTP
+                        logger.info("📝 Step 8: Submitting final registration with OTP...")
+                        from .registration_submitter import RegistrationSubmitter
+                        registration_submitter = RegistrationSubmitter()
+                        
+                        final_result = await registration_submitter.submit_final_registration(
+                            form_data=otp_form_data,
+                            captcha_token=captcha_token,
+                            captcha_id=captcha_id_from_solution,
+                            otp_code=otp_code,
+                            encrypted_email=otp_result.get('encryptEmail', ''),
+                            encrypted_mobile=otp_result.get('encryptMobile', ''),
+                            security_code=otp_result.get('securityCode', ''),
+                            antiforgery_token=antiforgery_token,
+                            session_cookies=session_cookies,
+                            proxy_url=proxy_url
+                        )
+                        
+                        if not final_result.get('success'):
+                            logger.error(f"❌ Final registration failed: {final_result.get('error')}")
+                            return BLSAccountCreationResult(
+                                success=False,
+                                status="error",
+                                error_message=f"Final registration failed: {final_result.get('error')}"
+                            )
+                        
+                        logger.info(f"🎉 BLS account created successfully: {real_email}")
+                        
+                        return BLSAccountCreationResult(
+                            success=True,
+                            status="completed",
+                            account_id=real_email,
+                            message="BLS account created successfully"
+                        )
+                        
+                    elif not captcha_solution.get("success"):
+                        logger.warning("⏳ Browser-based captcha solving failed - manual required")
+                        captcha_id = captcha_info.get("captcha_id")
+                        captcha_data_param = self.captcha_handler._extract_captcha_data_param(registration_page)
+                        
+                        result = BLSAccountCreationResult(
+                            success=True,
+                            status="captcha_required",
+                            captcha_id=captcha_id,
+                            captcha_data_param=captcha_data_param,
+                            message="Manual captcha solving required"
+                        )
+                        return result
+                # Handle old string response format
+                elif captcha_solution == "MANUAL_CAPTCHA_REQUIRED":
                     logger.info("⏳ Manual captcha solving required...")
                     captcha_id = captcha_info.get("captcha_id")
                     captcha_data_param = self.captcha_handler._extract_captcha_data_param(registration_page)
@@ -95,29 +229,14 @@ class BLSAccountCreator:
                     )
                     logger.info(f"🔑 Returning result: {result}")
                     return result
-                
-                if not captcha_solution:
+                elif not captcha_solution:
                     return BLSAccountCreationResult(
                         success=False,
                         status="error",
                         error_message="Failed to solve captcha"
                     )
             else:
-                logger.info("ℹ️ No captcha detected, proceeding with form submission")
-            
-            # Step 6: Submit form with captcha solution
-            submission_result = await self.form_handler.submit_form(
-                registration_page, form_data, captcha_solution, proxy_url, aws_waf_token
-            )
-            
-            if not submission_result:
-                return BLSAccountCreationResult(
-                    success=False,
-                    status="error",
-                    error_message="Failed to submit form"
-                )
-            
-            logger.info(f"BLS account created successfully: {real_email}")
+                logger.info("ℹ️ No captcha detected, proceeding with registration")
             return BLSAccountCreationResult(
                 success=True,
                 status="completed",

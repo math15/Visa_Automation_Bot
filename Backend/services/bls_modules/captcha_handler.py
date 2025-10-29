@@ -17,6 +17,7 @@ from .image_extractor import ImageExtractor
 from .instruction_analyzer import InstructionAnalyzer
 from .captcha_solver import CaptchaSolver
 from .captcha_submitter import CaptchaSubmitter
+from .browser_captcha_solver import BrowserCaptchaSolver
 
 
 class CaptchaHandler:
@@ -32,6 +33,7 @@ class CaptchaHandler:
         self.instruction_analyzer = InstructionAnalyzer()
         self.captcha_solver = CaptchaSolver()
         self.captcha_submitter = CaptchaSubmitter()
+        self.browser_captcha_solver = BrowserCaptchaSolver()
     
     def extract_captcha_info(self, page_content: str) -> Dict[str, Any]:
         """Extract captcha information from page content"""
@@ -91,19 +93,42 @@ class CaptchaHandler:
             return {}
     
     async def solve_captcha(self, captcha_info: Dict[str, Any], form_data: Dict[str, Any], 
-                          proxy_url: str = None, registration_page: str = None, session_cookies: Dict[str, str] = None) -> Optional[str]:
-        """Solve captcha using the appropriate method"""
+                          proxy_url: str = None, registration_page: str = None, session_cookies: Dict[str, str] = None,
+                          use_browser: bool = True, headless: bool = False, manual_mode: bool = False) -> Optional[str]:
+        """
+        Solve captcha using the appropriate method
+        
+        Args:
+            captcha_info: Captcha information dictionary
+            form_data: Form data from registration page
+            proxy_url: Proxy URL in format "username:password@host:port"
+            registration_page: Registration page HTML content
+            session_cookies: Session cookies
+            use_browser: If True, use browser-based solving (recommended). If False, use HTTP requests.
+            headless: If True, run browser in headless mode (no window shown)
+            
+        Returns:
+            Captcha solution string or "MANUAL_CAPTCHA_REQUIRED" if failed
+        """
         try:
             captcha_type = captcha_info.get("type")
             logger.info(f"🔍 Solving captcha type: {captcha_type}")
+            logger.info(f"🌐 Using browser-based solving: {use_browser}")
             
             if captcha_type == "bls_captcha":
                 captcha_id = captcha_info.get("captcha_id")
                 page_url = captcha_info.get("page_url", self.register_url)
                 
-                return await self._solve_bls_image_captcha(
-                    captcha_id, page_url, form_data, proxy_url, registration_page, session_cookies
-                )
+                if use_browser:
+                    # Use browser-based solving (RECOMMENDED - bypasses all detection)
+                    return await self._solve_bls_captcha_with_browser(
+                        captcha_id, page_url, form_data, proxy_url, session_cookies, headless, manual_mode
+                    )
+                else:
+                    # Use HTTP-based solving (may fail due to server detection)
+                    return await self._solve_bls_image_captcha(
+                        captcha_id, page_url, form_data, proxy_url, registration_page, session_cookies
+                    )
             else:
                 logger.warning(f"⚠️ Unsupported captcha type: {captcha_type}")
                 return "MANUAL_CAPTCHA_REQUIRED"
@@ -811,3 +836,98 @@ class CaptchaHandler:
         
         logger.error(f"❌ Failed to get captcha page content after {max_retries} attempts")
         return "", {}, None
+    
+    async def _solve_bls_captcha_with_browser(self, captcha_id: str, page_url: str, 
+                                            form_data: Dict[str, Any], proxy_url: str = None, 
+                                            session_cookies: Dict[str, str] = None, headless: bool = False,
+                                            manual_mode: bool = False) -> Dict[str, Any]:
+        """
+        Solve BLS captcha using browser automation (RECOMMENDED method)
+        
+        Args:
+            captcha_id: The captcha ID from the form
+            page_url: URL to the captcha page
+            form_data: Form data from registration page
+            proxy_url: Proxy URL in format "username:password@host:port"
+            session_cookies: Session cookies
+            headless: If True, run browser in headless mode (no window shown)
+            manual_mode: If True, wait for manual captcha solving
+            
+        Returns:
+            Dictionary with captcha solution status and tokens:
+            {
+                "status": "CAPTCHA_SOLVED" | "MANUAL_CAPTCHA_REQUIRED",
+                "success": bool,
+                "captcha_token": str (if successful),
+                "captcha_id": str (if successful),
+                "full_result": dict,
+                "error": str (if failed)
+            }
+        """
+        try:
+            logger.info("🌐 Using browser-based captcha solving (RECOMMENDED)")
+            logger.info(f"🔗 Captcha page URL: {page_url[:100]}...")
+            logger.info(f"👁️ Headless mode: {headless}")
+            
+            # Prepare cookies for browser
+            browser_cookies = {}
+            if session_cookies:
+                # Filter out invalid cookie attributes
+                invalid_keys = ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']
+                browser_cookies = {k: v for k, v in session_cookies.items() if k not in invalid_keys}
+                logger.info(f"🍪 Prepared {len(browser_cookies)} cookies for browser")
+            
+            # Use the browser captcha solver
+            success, result = await self.browser_captcha_solver.solve_captcha_in_browser(
+                captcha_url=page_url,
+                cookies=browser_cookies,
+                proxy_url=proxy_url,
+                headless=headless,
+                manual_mode=manual_mode
+            )
+            
+            if success:
+                logger.info("✅ Browser-based captcha solving successful!")
+                logger.info(f"📊 Result: {result}")
+                
+                # Extract captcha token and ID from result
+                captcha_token = result.get('captcha_token')
+                captcha_id = result.get('captcha_id')
+                
+                if captcha_token:
+                    logger.info(f"🔑 Captcha Token: {captcha_token[:50]}...")
+                    logger.info(f"🆔 Captcha ID: {captcha_id[:50] if captcha_id else 'None'}...")
+                    
+                    # Return structured response with token
+                    return {
+                        "status": "CAPTCHA_SOLVED",
+                        "success": True,
+                        "captcha_token": captcha_token,
+                        "captcha_id": captcha_id,
+                        "full_result": result
+                    }
+                else:
+                    # Token not captured, but captcha was solved
+                    logger.warning("⚠️ Captcha solved but token not captured")
+                    return {
+                        "status": "CAPTCHA_SOLVED",
+                        "success": True,
+                        "captcha_token": None,
+                        "captcha_id": None,
+                        "full_result": result
+                    }
+            else:
+                logger.error(f"❌ Browser-based captcha solving failed: {result}")
+                return {
+                    "status": "MANUAL_CAPTCHA_REQUIRED",
+                    "success": False,
+                    "error": result.get('error') if isinstance(result, dict) else str(result)
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Error in browser-based captcha solving: {e}")
+            return {
+                "status": "MANUAL_CAPTCHA_REQUIRED",
+                "success": False,
+                "error": str(e)
+            }

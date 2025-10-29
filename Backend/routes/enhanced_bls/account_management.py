@@ -10,41 +10,59 @@ from models.database import Account
 
 # Request models for account management
 class AccountCreateRequest(BaseModel):
-    first_name: str
-    last_name: str
-    family_name: Optional[str] = None
+    # Personal Information (BLS format)
+    sur_name: Optional[str] = None  # BLS: SurName (Family Name) - optional
+    first_name: str  # BLS: FirstName (Given Name) - required
+    last_name: str  # BLS: LastName - required
+    family_name: Optional[str] = None  # Legacy field
     date_of_birth: str  # YYYY-MM-DD format
     gender: str = "Male"
     marital_status: str = "Single"
+    
+    # Passport Information (BLS format)
     passport_number: str
     passport_type: str = "Ordinary"
     passport_issue_date: str  # YYYY-MM-DD format
     passport_expiry_date: str  # YYYY-MM-DD format
-    passport_issue_place: Optional[str] = None
+    passport_issue_place: str  # BLS: Required!
     passport_issue_country: Optional[str] = None
+    
+    # Contact Information
     email: str
     mobile: str
     phone_country_code: str = "+213"
+    
+    # Location Information
     birth_country: Optional[str] = None
     country_of_residence: Optional[str] = None
+    
+    # Additional Information
     number_of_members: int = 1
     relationship: str = "Self"
     primary_applicant: bool = True
+    
+    # Credentials
     password: str
 
 class AccountUpdateRequest(BaseModel):
+    # Personal Information (BLS format)
+    sur_name: Optional[str] = None  # BLS: SurName
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     family_name: Optional[str] = None
     date_of_birth: Optional[str] = None
     gender: Optional[str] = None
     marital_status: Optional[str] = None
+    
+    # Passport Information
     passport_number: Optional[str] = None
     passport_type: Optional[str] = None
     passport_issue_date: Optional[str] = None
     passport_expiry_date: Optional[str] = None
     passport_issue_place: Optional[str] = None
     passport_issue_country: Optional[str] = None
+    
+    # Contact Information
     email: Optional[str] = None
     mobile: Optional[str] = None
     phone_country_code: Optional[str] = None
@@ -61,26 +79,33 @@ class BLSAccountCreateRequest(BaseModel):
 
 class AccountResponse(BaseModel):
     id: int
+    # Personal Information (BLS format)
+    sur_name: Optional[str]  # BLS: SurName
     first_name: str
     last_name: str
     family_name: Optional[str]
     date_of_birth: str
     gender: str
     marital_status: str
+    # Passport Information
     passport_number: str
     passport_type: str
     passport_issue_date: str
     passport_expiry_date: str
     passport_issue_place: Optional[str]
     passport_issue_country: Optional[str]
+    # Contact Information
     email: str
     mobile: str
     phone_country_code: str
+    # Location Information
     birth_country: Optional[str]
     country_of_residence: Optional[str]
+    # Additional Information
     number_of_members: int
     relationship: str
     primary_applicant: bool
+    # Status
     status: str
     bls_status: str
     bls_username: Optional[str]
@@ -116,8 +141,9 @@ async def create_account(
         if existing_passport:
             raise HTTPException(status_code=400, detail="Account with this passport number already exists")
         
-        # Create new account
+        # Create new account (BLS format)
         new_account = Account(
+            sur_name=account_data.sur_name,  # BLS: SurName
             first_name=account_data.first_name,
             last_name=account_data.last_name,
             family_name=account_data.family_name,
