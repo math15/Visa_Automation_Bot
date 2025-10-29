@@ -15,6 +15,9 @@ curl-cffi>=0.5.10
 pyscrypt>=1.6.2
 aiohttp>=3.9.0
 
+# HTML Parsing
+beautifulsoup4>=4.12.2
+
 # Browser Automation for Captcha Solving
 playwright>=1.40.0
 

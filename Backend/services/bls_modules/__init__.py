@@ -188,7 +188,8 @@ class BLSAccountCreator:
             return None
     
     async def submit_captcha_solution(self, captcha_id: str, captcha_solution: str, 
-                                    captcha_data_param: str, proxy_url: str = None) -> 'BLSAccountCreationResult':
+                                    captcha_data_param: str, proxy_url: str = None, 
+                                    session_cookies: Dict[str, str] = None) -> 'BLSAccountCreationResult':
         """Submit captcha solution and complete account creation"""
         # Import locally to avoid circular imports
         from main import BLSAccountCreationResult
@@ -196,9 +197,15 @@ class BLSAccountCreator:
         try:
             logger.info(f"🎯 Submitting captcha solution for captcha ID: {captcha_id}")
             
-            # Use captcha submitter to submit the solution
+            # CRITICAL: Use session cookies from registration page for consistency
+            if session_cookies:
+                logger.info(f"🍪 Using session cookies from registration page: {list(session_cookies.keys())}")
+            else:
+                logger.warning("⚠️ No session cookies provided - session may be inconsistent")
+            
+            # Use captcha submitter to submit the solution with session cookies
             submission_result = await self.captcha_submitter.submit_captcha_solution(
-                captcha_id, captcha_solution, captcha_data_param, proxy_url
+                captcha_id, captcha_solution, captcha_data_param, None, session_cookies, proxy_url
             )
             
             if submission_result and submission_result.get('success'):

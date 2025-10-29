@@ -14,7 +14,7 @@ class CaptchaService:
     """Service for solving captchas using NoCaptcha.io API"""
     
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or "mayas94-9c2063ba-0944-cd88-ab10-9c4325fbb9fd"  # Your actual API key
+        self.api_key = api_key or "mayas94-e794b1ea-f6b5-582a-46c6-980f5c6cd7c3"  # Your actual API key
         self.api_url = "https://api.nocaptchaai.com"
         logger.info(f"🔑 CaptchaService initialized with NoCaptchaAI API: {self.api_url}")
         logger.info(f"🔑 API Key: {self.api_key}")

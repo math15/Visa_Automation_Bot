@@ -82,7 +82,7 @@ class CaptchaHandler:
             return {
                 "type": "bls_captcha",
                 "captcha_id": captcha_id,
-                "site_key": "mayas94-9c2063ba-0944-cd88-ab10-9c4325fbb9fd",  # NoCaptchaAI key
+                "site_key": "mayas94-e794b1ea-f6b5-582a-46c6-980f5c6cd7c3",  # NoCaptchaAI key
                 "page_url": page_url
             }
             
@@ -155,51 +155,38 @@ class CaptchaHandler:
             
             result = {}
             
-            # Extract Id field
+            # Extract Id field - HTML decode ONLY (browser does this automatically)
             id_pattern = r'<input[^>]*name="Id"[^>]*value="([^"]*)"'
             id_match = re.search(id_pattern, captcha_page_content)
             if id_match:
                 captcha_id = id_match.group(1)
-                # Apply both URL decoding and HTML entity decoding
-                import urllib.parse
+                # HTML decode ONLY (converts &#x2B; to +), NO URL decoding
                 import html
-                original_id = captcha_id
-                captcha_id = urllib.parse.unquote(captcha_id)  # URL decode first
-                captcha_id = html.unescape(captcha_id)         # Then HTML entity decode
+                captcha_id = html.unescape(captcha_id)
                 result['Id'] = captcha_id
-                logger.info(f"✅ Extracted captcha page Id: {captcha_id[:20]}...")
-                if original_id != captcha_id:
-                    logger.info(f"🔧 Double decoding: '{original_id[:20]}...' → '{captcha_id[:20]}...'")
+                logger.info(f"✅ Extracted captcha page Id (HTML decoded only): {captcha_id[:20]}...")
             
-            # Extract Captcha field
+            # Extract Captcha field - HTML decode ONLY (browser does this automatically)
             captcha_pattern = r'<input[^>]*name="Captcha"[^>]*value="([^"]*)"'
             captcha_match = re.search(captcha_pattern, captcha_page_content)
             if captcha_match:
                 captcha_data = captcha_match.group(1)
-                # Apply both URL decoding and HTML entity decoding
-                import urllib.parse
+                # HTML decode ONLY (converts &#x2B; to +), NO URL decoding
                 import html
-                original_captcha = captcha_data
-                captcha_data = urllib.parse.unquote(captcha_data)  # URL decode first
-                captcha_data = html.unescape(captcha_data)         # Then HTML entity decode
+                captcha_data = html.unescape(captcha_data)
                 result['Captcha'] = captcha_data
-                logger.info(f"✅ Extracted captcha page Captcha: {captcha_data[:20]}...")
-                if original_captcha != captcha_data:
-                    logger.info(f"🔧 Double decoding: '{original_captcha[:20]}...' → '{captcha_data[:20]}...'")
+                logger.info(f"✅ Extracted captcha page Captcha (HTML decoded only): {captcha_data[:20]}...")
             
-            # Extract __RequestVerificationToken field
+            # Extract __RequestVerificationToken field - HTML decode ONLY
             token_pattern = r'<input[^>]*name="__RequestVerificationToken"[^>]*value="([^"]*)"'
             token_match = re.search(token_pattern, captcha_page_content)
             if token_match:
                 token_data = token_match.group(1)
-                # Decode URL encoding using Python's built-in decoder
-                import urllib.parse
-                original_token = token_data
-                token_data = urllib.parse.unquote(token_data)
+                # HTML decode ONLY (in case there are entities), NO URL decoding
+                import html
+                token_data = html.unescape(token_data)
                 result['__RequestVerificationToken'] = token_data
-                logger.info(f"✅ Extracted captcha page __RequestVerificationToken: {token_data[:20]}...")
-                if original_token != token_data:
-                    logger.info(f"🔧 URL decoding: '{original_token[:20]}...' → '{token_data[:20]}...'")
+                logger.info(f"✅ Extracted captcha page __RequestVerificationToken (HTML decoded only): {token_data[:20]}...")
             
             return result
                 
@@ -329,6 +316,11 @@ class CaptchaHandler:
             logger.info(f"✅ Using captcha page data: {captcha_page_data[:20]}...")
             logger.info(f"✅ Using captcha page token: {captcha_page_token[:20] if captcha_page_token else 'None'}...")
             
+            # Extract AWS WAF token from captcha page cookies
+            aws_waf_token = captcha_page_cookies.get('aws-waf-token', '')
+            if aws_waf_token:
+                logger.info(f"🔑 Extracted AWS WAF token from captcha page cookies")
+            
             # Solve captcha
             selected_image_ids = await self.captcha_solver.solve_bls_image_captcha(captcha_images, image_ids, instruction)
             if not selected_image_ids:
@@ -337,16 +329,29 @@ class CaptchaHandler:
             
             # Submit solution using the correct Id and Captcha from captcha page
             # Use the fresh cookies from the captcha page (includes aws-waf-token)
-            # Add the __RequestVerificationToken to the cookies for submission
-            if captcha_page_token:
-                captcha_page_cookies['__RequestVerificationToken'] = captcha_page_token
+            # NOTE: __RequestVerificationToken is from form data, not cookies
             
-            # Extract AWS WAF token from cookies for submission
-            aws_waf_token = captcha_page_cookies.get('aws-waf-token', None)
-            logger.info(f"🔑 AWS WAF token for submission: {aws_waf_token[:20] if aws_waf_token else 'None'}...")
+            # Use the captcha page cookies (has fresh antiforgery token from captcha page)
+            original_session_cookies = captcha_page_cookies.copy()
+            
+            # Ensure AWS WAF token is included
+            if aws_waf_token:
+                original_session_cookies['aws-waf-token'] = aws_waf_token
+                logger.info(f"🔑 Using AWS WAF token from captcha page")
+            
+            # Keep visitorId_current from registration page (for session consistency)
+            original_session_cookies['visitorId_current'] = self.visitor_id
+            logger.info(f"🔑 Using visitorId_current ({self.visitor_id}) from registration page")
+            logger.info(f"🔑 Using ALL OTHER COOKIES from CAPTCHA PAGE (including antiforgery)")
+            
+            # Debug: Show which cookies are being used
+            logger.info(f"🍪 Cookies from captcha page: {list(captcha_page_cookies.keys())}")
+            logger.info(f"🍪 Final cookies for submission: {list(original_session_cookies.keys())}")
+            logger.info(f"🔍 captcha_session type: {type(captcha_session)}, is None: {captcha_session is None}")
             
             success = await self.captcha_submitter.submit_captcha_solution(
-                captcha_page_id, selected_image_ids, captcha_page_data, aws_waf_token, captcha_page_cookies, proxy_url, captcha_session
+                captcha_page_id, selected_image_ids, captcha_page_data, aws_waf_token, 
+                original_session_cookies, proxy_url, captcha_session, request_verification_token=captcha_page_token
             )
                         
             if success:
@@ -468,22 +473,36 @@ class CaptchaHandler:
                 end = time.time()
                 logger.info(f"✅ Challenge solved in {end - start:.2f} seconds!")
                 
+                # Store the token as aws_waf_token for later use
+                aws_waf_token = token
+                
                 # Step 5: Make NEW request with token (same as test script)
-                logger.info(f"🔑 Generated AWS WAF token: {token[:20]}...")
+                logger.info(f"🔑 Generated AWS WAF token: {aws_waf_token[:20]}...")
                 
                 logger.info("🌐 Testing with token...")
                 session.headers.update({
-                    "cookie": "aws-waf-token=" + token
+                    "cookie": "aws-waf-token=" + aws_waf_token
                 })
                 
                 # Store AWS WAF token in session cookies for later use
-                session.cookies.set('aws-waf-token', token)
+                session.cookies.set('aws-waf-token', aws_waf_token)
                 
                 solved_response = session.get(page_url, timeout=30)
                 logger.info(f"📡 Solved response: {solved_response.status_code}")
                 logger.info(f"📄 Solved content length: {len(solved_response.text)}")
                 logger.info(f"🔍 DEBUG - Response headers: {dict(solved_response.headers)}")
                 logger.info(f"🔍 DEBUG - Response text preview: {solved_response.text[:200]}...")
+                
+                # If we got empty content with 200 status, retry the request multiple times (may be intermediate response)
+                max_retries = 3
+                retry_count = 0
+                while solved_response.status_code == 200 and len(solved_response.text) == 0 and retry_count < max_retries:
+                    retry_count += 1
+                    logger.info(f"⚠️ Got empty response with 200 status - retrying request {retry_count}/{max_retries}...")
+                    import time
+                    time.sleep(0.5)
+                    solved_response = session.get(page_url, timeout=30)
+                    logger.info(f"📡 Retry {retry_count} response: {solved_response.status_code}, content length: {len(solved_response.text)}")
                 
                 if solved_response.status_code == 200 and len(solved_response.text) > 100:
                     logger.info(f"✅ Retrieved captcha page content: {len(solved_response.text)} characters")
@@ -509,11 +528,14 @@ class CaptchaHandler:
                         logger.info(f"🍪 Extracted set-cookie header: {cookie_header[:100]}...")
                         
                         # Parse cookies from set-cookie header (same as registration page)
-                        cookie_pattern = r'([^=]+)=([^;]+)'
+                        # Only match actual cookies (not attributes like path, samesite, httponly)
+                        cookie_pattern = r'\s*([^=; \t\n]+)=([^;]+)'
                         cookies = re.findall(cookie_pattern, cookie_header)
                         for name, value in cookies:
-                            session_cookies[name] = value
-                            logger.info(f"🍪 Parsed cookie: {name}={value[:20]}...")
+                            # Skip cookie attributes, only keep actual cookie names
+                            if name.strip().lower() not in ['path', 'samesite', 'httponly', 'domain', 'expires', 'max-age', 'secure']:
+                                session_cookies[name.strip()] = value.strip()
+                                logger.info(f"🍪 Parsed cookie: {name}={value[:20]}...")
                     else:
                         logger.info("🔍 No set-cookie header in captcha page response")
                     
@@ -620,16 +642,23 @@ class CaptchaHandler:
             }
             
             # Add session cookies from registration page (but NOT the old WAF token)
+            # CRITICAL: Use SAME antiforgery token and currentUserId from registration page for session consistency
             cookie_parts = []
             
             # Add visitor ID cookie
             cookie_parts.append(f"visitorId_current={self.visitor_id}")
             
+            # Add currentUserId cookie for session consistency (same as visitorId_current)
+            cookie_parts.append(f"currentUserId={self.visitor_id}")
+            
             # Add antiforgery token from registration page if available
             if form_data and '__RequestVerificationToken' in form_data:
                 antiforgery_token = form_data['__RequestVerificationToken']
                 cookie_parts.append(f".AspNetCore.Antiforgery.cyS7zUT4rj8={antiforgery_token}")
-                logger.info(f"🔑 Using antiforgery token for captcha WAF bypass")
+                logger.info(f"🔑 Using SAME antiforgery token from registration page for session consistency")
+                logger.info(f"🔑 Antiforgery token: {antiforgery_token[:20]}...")
+            else:
+                logger.warning("⚠️ No antiforgery token found in form_data - session may be inconsistent")
             
             if cookie_parts:
                 headers['Cookie'] = "; ".join(cookie_parts)
