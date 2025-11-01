@@ -45,6 +45,10 @@ class Proxy(Base):
     validation_status = Column(String(50), default="pending")
     last_validated = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Usage tracking (optional fields)
+    usage_count = Column(Integer, default=0, nullable=True)
+    last_used = Column(DateTime, nullable=True)
 
 class Account(Base):
     """Base account model for storing account information before BLS creation"""

@@ -11,7 +11,28 @@ async def generate_real_email() -> Dict[str, Any]:
     try:
         logger.info("Generating real temporary email")
         email, service_name = await real_email_service.generate_real_email()
-        return {"success": True, "email": email, "service": service_name, "message": f"Real email generated using {service_name}"}
+        
+        # Determine inbox URL based on service
+        inbox_url = None
+        if service_name == "mailtm":
+            inbox_url = "https://mail.tm/"  # Mail.tm doesn't have direct inbox URL
+        elif service_name == "tempmail_io":
+            inbox_url = "https://temp-mail.io/"
+        elif '1secmail' in email:
+            username, domain = email.split('@')
+            inbox_url = f"https://www.1secmail.com/?login={username}&domain={domain}"
+        elif 'guerrillamail' in email:
+            inbox_url = "https://www.guerrillamail.com/inbox"
+        elif 'tempmail' in email:
+            inbox_url = "https://temp-mail.org/en/"
+        
+        return {
+            "success": True, 
+            "email": email, 
+            "service_name": service_name,  # Changed from "service" to "service_name"
+            "inbox_url": inbox_url,
+            "message": f"Real email generated using {service_name}"
+        }
     except Exception as e:
         logger.error(f"Error generating real email: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -56,7 +56,8 @@ class OTPHandler:
                 otp_form_data,
                 headers,
                 session_cookies,
-                proxy_url
+                proxy_url,
+                antiforgery_token
             )
             
             if result.get('success'):
@@ -195,7 +196,8 @@ class OTPHandler:
         form_data: Dict[str, str],
         headers: Dict[str, str],
         session_cookies: Dict[str, str],
-        proxy_url: str = None
+        proxy_url: str = None,
+        antiforgery_token: str = None
     ) -> Dict[str, Any]:
         """Send the OTP request"""
         
@@ -217,43 +219,194 @@ class OTPHandler:
                 invalid_keys = ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']
                 cookies = {k: v for k, v in session_cookies.items() if k.lower() not in invalid_keys}
             
+            # Add visitorId_current if not present (REQUIRED by BLS!)
+            # This should come from the registration page cookies, but fallback to default if missing
+            if 'visitorId_current' not in cookies:
+                cookies['visitorId_current'] = '22615162'  # Fallback to default
+                logger.warning("⚠️ visitorId_current not found in cookies, using fallback: 22615162")
+            else:
+                logger.info(f"🆔 Using visitorId_current from cookies: {cookies['visitorId_current']}")
+            
+            # Add requestverificationtoken header (REQUIRED by BLS OTP endpoint!)
+            if antiforgery_token:
+                headers['requestverificationtoken'] = antiforgery_token
+                logger.info(f"🔑 Added requestverificationtoken header: {antiforgery_token[:50]}...")
+            
             # Prepare proxy
             proxies = None
             if proxy_url:
-                if '@' in proxy_url:
+                # Remove http:// prefix if present (it will be added back)
+                clean_proxy = proxy_url.replace('http://', '').replace('https://', '')
+                
+                if '@' in clean_proxy:
                     # Format: username:password@host:port
-                    parts = proxy_url.split('@')
-                    auth = parts[0]
-                    host_port = parts[1]
                     proxies = {
-                        'http': f'http://{auth}@{host_port}',
-                        'https': f'http://{auth}@{host_port}'
+                        'http': f'http://{clean_proxy}',
+                        'https': f'http://{clean_proxy}'
                     }
                 else:
                     # Format: host:port
                     proxies = {
-                        'http': f'http://{proxy_url}',
-                        'https': f'http://{proxy_url}'
+                        'http': f'http://{clean_proxy}',
+                        'https': f'http://{clean_proxy}'
                     }
-                logger.info(f"🌐 Using proxy: {proxy_url[:50]}...")
+                logger.info(f"🌐 Using proxy: {proxies['http'][:70]}...")
             
             # URL encode form data
             encoded_data = urllib.parse.urlencode(form_data)
             
             logger.info(f"📤 Sending POST request to: {self.otp_endpoint}")
             logger.info(f"📦 Data length: {len(encoded_data)} bytes")
+            logger.info(f"🍪 Cookies being sent: {list(cookies.keys())}")
+            if 'aws-waf-token' in cookies:
+                logger.info(f"🔑 AWS WAF token present: {cookies['aws-waf-token'][:50]}...")
+            else:
+                logger.warning("⚠️ No AWS WAF token in cookies!")
             
-            # Send request
+            # Send request (with WAF retry logic)
             response = session.post(
                 self.otp_endpoint,
                 data=encoded_data,
                 headers=headers,
                 cookies=cookies,
                 proxies=proxies,
-                timeout=30
+                timeout=30,
+                allow_redirects=False
             )
             
             logger.info(f"📡 Response status: {response.status_code}")
+            logger.info(f"📡 Response headers: {dict(response.headers)}")
+            
+            # Check for AWS WAF challenge (status 202)
+            if response.status_code == 202:
+                logger.warning("⚠️ AWS WAF challenge detected (202)!")
+                logger.info("🔄 Need to solve fresh WAF challenge for OTP endpoint...")
+                
+                # Try to extract and solve WAF challenge from response
+                try:
+                    response_text = response.text
+                    
+                    # Check if response body is empty (content-length: 0)
+                    if not response_text or len(response_text) < 100:
+                        logger.warning("⚠️ 202 response has empty body")
+                        logger.info("💡 Empty 202 means AWS WAF token is invalid/expired for this endpoint")
+                        logger.info("🔄 Will use existing WAF token from registration page and retry with delays...")
+                        
+                        # The aws-waf-token cookie should already be in cookies from the registration page
+                        # Try multiple retries with increasing delays
+                        import asyncio
+                        max_retries = 3
+                        
+                        for retry_num in range(1, max_retries + 1):
+                            wait_time = retry_num * 2  # 2s, 4s, 6s
+                            logger.info(f"🔄 Retry {retry_num}/{max_retries}: Waiting {wait_time}s before retry...")
+                            await asyncio.sleep(wait_time)
+                            
+                            retry_response = session.post(
+                                self.otp_endpoint,
+                                data=encoded_data,
+                                headers=headers,
+                                cookies=cookies,
+                                proxies=proxies,
+                                timeout=30,
+                                allow_redirects=False
+                            )
+                            
+                            logger.info(f"📡 Retry {retry_num} response status: {retry_response.status_code}")
+                            
+                            if retry_response.status_code != 202:
+                                logger.info(f"✅ Retry {retry_num} successful! Status: {retry_response.status_code}")
+                                response = retry_response
+                                break
+                            else:
+                                logger.warning(f"⚠️ Retry {retry_num} still returned 202")
+                                if retry_num == max_retries:
+                                    logger.error("❌ All retries exhausted, WAF challenge persists")
+                                    response = retry_response
+                        
+                        # Skip further WAF challenge solving since we already retried
+                        response_text = ""  # Clear to skip the gokuProps check below
+                    
+                    # Check if this is a WAF challenge page (with body content)
+                    if response_text and len(response_text) > 100 and ('gokuProps' in response_text or 'x-amzn-waf-action' in response.headers):
+                        logger.info("🔍 Detected WAF challenge page with content, solving directly...")
+                        
+                        # Solve WAF challenge directly (without full bypass validation)
+                        try:
+                            from awswaf.aws import AwsWaf
+                            import asyncio
+                            
+                            # Extract WAF challenge data
+                            logger.info("🔍 Extracting WAF challenge data...")
+                            goku_props, host = AwsWaf.extract(response_text)
+                            
+                            if goku_props and host:
+                                logger.info(f"✅ Extracted WAF challenge data")
+                                logger.info(f"🔑 Host: {host[:50]}...")
+                                
+                                # Solve the challenge
+                                logger.info("🔄 Solving AWS WAF challenge...")
+                                waf_token = AwsWaf.solve_challenge(goku_props, host)
+                                logger.info(f"✅ Generated WAF token: {waf_token[:50]}...")
+                                
+                                # Update cookies with new token
+                                cookies['aws-waf-token'] = waf_token
+                                logger.info("🔑 Updated cookies with fresh WAF token")
+                                
+                                # Retry the OTP request with new token
+                                logger.info("🔄 Retrying OTP POST request with fresh WAF token...")
+                                await asyncio.sleep(2)
+                                
+                                response = session.post(
+                                    self.otp_endpoint,
+                                    data=encoded_data,
+                                    headers=headers,
+                                    cookies=cookies,
+                                    proxies=proxies,
+                                    timeout=30,
+                                    allow_redirects=False
+                                )
+                                
+                                logger.info(f"📡 Retry response status: {response.status_code}")
+                            else:
+                                logger.error("❌ Failed to extract WAF challenge data")
+                                
+                        except Exception as e:
+                            logger.error(f"❌ Error solving WAF challenge: {e}")
+                    else:
+                        logger.warning("⚠️ 202 response but no WAF challenge detected, retrying...")
+                        import asyncio
+                        await asyncio.sleep(2)
+                        
+                        response = session.post(
+                            self.otp_endpoint,
+                            data=encoded_data,
+                            headers=headers,
+                            cookies=cookies,
+                            proxies=proxies,
+                            timeout=30,
+                            allow_redirects=False
+                        )
+                        
+                        logger.info(f"📡 Retry response status: {response.status_code}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error handling WAF challenge: {e}")
+                    logger.warning("⚠️ Attempting simple retry...")
+                    import asyncio
+                    await asyncio.sleep(2)
+                    
+                    response = session.post(
+                        self.otp_endpoint,
+                        data=encoded_data,
+                        headers=headers,
+                        cookies=cookies,
+                        proxies=proxies,
+                        timeout=30,
+                        allow_redirects=False
+                    )
+                    
+                    logger.info(f"📡 Fallback retry response status: {response.status_code}")
             
             if response.status_code == 200:
                 try:

@@ -11,6 +11,7 @@ from .waf_bypass import WAFBypassHandler
 from .form_handler import FormHandler
 from .captcha_handler import CaptchaHandler
 from .captcha_submitter import CaptchaSubmitter
+from .browser_registration_handler import BrowserRegistrationHandler
 from ..proxy_service import proxy_service
 
 
@@ -28,8 +29,152 @@ class BLSAccountCreator:
         self.form_handler = FormHandler()
         self.captcha_handler = CaptchaHandler(self.base_url, self.register_url, self.visitor_id)
         self.captcha_submitter = CaptchaSubmitter()
+        self.browser_registration_handler = BrowserRegistrationHandler()
         
         logger.info(f"🚀 BLS Account Creator initialized with visitor ID: {self.visitor_id}")
+    
+    async def create_account_with_browser(self, account_data: Dict[str, Any], db: Session = None, use_browser_flow: bool = True) -> 'BLSAccountCreationResult':
+        """
+        Create BLS account using full browser flow (RECOMMENDED - bypasses all WAF issues)
+        
+        This method:
+        1. Opens registration page in browser
+        2. Auto-fills all form fields
+        3. User solves captcha manually
+        4. Clicks Send OTP button in browser
+        5. Retrieves OTP from email
+        6. Auto-fills OTP and submits
+        7. Returns success/failure
+        """
+        from main import BLSAccountCreationResult
+        
+        try:
+            logger.info(f"🌐 Starting browser-based BLS account creation for: {account_data.email}")
+            
+            # Step 1: Get proxy for browser (REQUIRED to avoid CloudFront 403!)
+            logger.info("📄 Step 1: Getting proxy for browser...")
+            proxy_url = None
+            try:
+                from services.proxy_service import ProxyService
+                proxy_service = ProxyService()
+                proxy_config = await proxy_service.get_algerian_proxy(db)
+                if proxy_config:
+                    # Format proxy URL
+                    if proxy_config.get('username') and proxy_config.get('password'):
+                        proxy_url = f"http://{proxy_config['username']}:{proxy_config['password']}@{proxy_config['host']}:{proxy_config['port']}"
+                        logger.info(f"🌐 Using proxy: {proxy_config['host']}:{proxy_config['port']} (with auth)")
+                        logger.info(f"🔑 Proxy credentials: username={proxy_config['username'][:10]}...")
+                    else:
+                        proxy_url = f"http://{proxy_config['host']}:{proxy_config['port']}"
+                        logger.warning(f"⚠️ Using proxy WITHOUT authentication: {proxy_config['host']}:{proxy_config['port']}")
+                        logger.warning(f"⚠️ This will likely fail! Proxy config: {proxy_config}")
+                else:
+                    logger.error("❌ No proxy available - CloudFront will block direct connections!")
+                    return BLSAccountCreationResult(
+                        success=False,
+                        status="error",
+                        error_message="No proxy available - direct connection blocked by CloudFront"
+                    )
+            except Exception as e:
+                logger.error(f"❌ Failed to get proxy: {e}")
+                return BLSAccountCreationResult(
+                    success=False,
+                    status="error",
+                    error_message=f"Failed to get proxy: {e}"
+                )
+            
+            # Step 2: Prepare minimal cookies (browser will generate the rest)
+            logger.info("📝 Step 2: Preparing minimal cookies...")
+            session_cookies = {}
+            
+            # Add visitorId_current (REQUIRED by BLS!)
+            session_cookies['visitorId_current'] = self.visitor_id
+            logger.info(f"🆔 Added visitorId_current to cookies for browser: {self.visitor_id}")
+            
+            # Step 3: Initialize email service and generate real temporary email if needed
+            logger.info("📧 Step 3: Initializing email service...")
+            from services.email_service import RealEmailService
+            email_service = RealEmailService()
+            
+            # Check if account email is a placeholder (@example.com) and generate real temp email
+            actual_email = account_data.email
+            email_service_name = None
+            
+            if '@example.com' in account_data.email or not account_data.email:
+                logger.info("⚠️ Detected placeholder email (@example.com), generating REAL temporary email...")
+                try:
+                    actual_email, email_service_name = await email_service.generate_real_email()
+                    logger.info(f"✅ Generated real temporary email: {actual_email} (service: {email_service_name})")
+                    logger.info(f"🌐 You can check inbox at:")
+                    if '1secmail' in actual_email:
+                        username, domain = actual_email.split('@')
+                        logger.info(f"   https://www.1secmail.com/?login={username}&domain={domain}")
+                    elif 'guerrillamail' in actual_email:
+                        logger.info(f"   https://www.guerrillamail.com/inbox")
+                    elif 'tempmail' in actual_email:
+                        logger.info(f"   https://temp-mail.org/en/")
+                except Exception as e:
+                    logger.error(f"❌ Failed to generate temporary email: {e}")
+                    logger.warning("⚠️ Using original email, manual OTP entry will be required")
+                    actual_email = account_data.email
+            else:
+                logger.info(f"✅ Using provided email: {actual_email}")
+            
+            # Step 4: Prepare user data for browser form
+            logger.info("📝 Step 4: Preparing user data...")
+            user_data = {
+                'SurName': account_data.family_name or '',
+                'FirstName': account_data.first_name,
+                'LastName': account_data.last_name,
+                'DateOfBirth': account_data.date_of_birth.strftime('%Y-%m-%dT%H:%M') if hasattr(account_data.date_of_birth, 'strftime') else str(account_data.date_of_birth),
+                'PassportNumber': account_data.passport_number,
+                'PassportIssueDate': account_data.passport_issue_date.strftime('%Y-%m-%dT%H:%M') if hasattr(account_data.passport_issue_date, 'strftime') else str(account_data.passport_issue_date),
+                'PassportExpiryDate': account_data.passport_expiry_date.strftime('%Y-%m-%dT%H:%M') if hasattr(account_data.passport_expiry_date, 'strftime') else str(account_data.passport_expiry_date),
+                'BirthCountry': account_data.birth_country or 'Algeria',
+                'PassportType': account_data.passport_type or 'Ordinary',
+                'IssuePlace': account_data.passport_issue_place,
+                'CountryOfResidence': account_data.country_of_residence or 'Algeria',
+                'Mobile': account_data.mobile,
+                'Email': actual_email  # Use real temporary email
+            }
+            
+            # Step 5: Complete registration in browser
+            logger.info("🌐 Step 5: Starting browser registration flow...")
+            registration_url = f"{self.base_url}{self.register_url}"
+            
+            success, result = await self.browser_registration_handler.complete_registration_in_browser(
+                registration_url=registration_url,
+                user_data=user_data,
+                cookies=session_cookies,
+                proxy_url=proxy_url,
+                headless=False,  # Show browser window
+                email_service=email_service,
+                email_service_name=email_service_name  # Pass service name for OTP retrieval
+            )
+            
+            if success:
+                logger.info(f"🎉 BLS account created successfully: {account_data.email}")
+                return BLSAccountCreationResult(
+                    success=True,
+                    status="completed",
+                    account_id=account_data.email,
+                    message="BLS account created successfully using browser flow"
+                )
+            else:
+                logger.error(f"❌ Browser registration failed: {result.get('error')}")
+                return BLSAccountCreationResult(
+                    success=False,
+                    status="error",
+                    error_message=f"Browser registration failed: {result.get('error')}"
+                )
+                
+        except Exception as e:
+            logger.error(f"❌ Error in browser-based account creation: {e}")
+            return BLSAccountCreationResult(
+                success=False,
+                status="error",
+                error_message=str(e)
+            )
     
     async def create_account(self, account_data: Dict[str, Any], db: Session = None) -> 'BLSAccountCreationResult':
         """Create a real BLS account with full automation using modular components"""
@@ -123,13 +268,19 @@ class BLSAccountCreator:
                         # Get antiforgery token
                         antiforgery_token = form_data.get('__RequestVerificationToken', '')
                         
+                        # Prepare cookies with AWS WAF token
+                        otp_cookies = session_cookies.copy() if session_cookies else {}
+                        if aws_waf_token and 'aws-waf-token' not in otp_cookies:
+                            otp_cookies['aws-waf-token'] = aws_waf_token
+                            logger.info(f"🔑 Added AWS WAF token to OTP request cookies: {aws_waf_token[:50]}...")
+                        
                         # Send OTP request
                         otp_result = await otp_handler.send_otp_request(
                             form_data=otp_form_data,
                             captcha_token=captcha_token,
                             captcha_id=captcha_id_from_solution,
                             antiforgery_token=antiforgery_token,
-                            session_cookies=session_cookies,
+                            session_cookies=otp_cookies,
                             proxy_url=proxy_url
                         )
                         
@@ -169,6 +320,9 @@ class BLSAccountCreator:
                         from .registration_submitter import RegistrationSubmitter
                         registration_submitter = RegistrationSubmitter()
                         
+                        # Prepare cookies with AWS WAF token for final submission
+                        final_cookies = otp_cookies.copy()  # Use the same cookies as OTP request
+                        
                         final_result = await registration_submitter.submit_final_registration(
                             form_data=otp_form_data,
                             captcha_token=captcha_token,
@@ -178,7 +332,7 @@ class BLSAccountCreator:
                             encrypted_mobile=otp_result.get('encryptMobile', ''),
                             security_code=otp_result.get('securityCode', ''),
                             antiforgery_token=antiforgery_token,
-                            session_cookies=session_cookies,
+                            session_cookies=final_cookies,
                             proxy_url=proxy_url
                         )
                         

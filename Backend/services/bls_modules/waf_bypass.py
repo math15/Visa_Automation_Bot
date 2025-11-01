@@ -21,53 +21,44 @@ class WAFBypassHandler:
         self.visitor_id = visitor_id
     
     async def try_comprehensive_bypass(self, proxy_url: str, headers: dict, method: str = "GET", data: dict = None, existing_cookies: dict = None) -> Optional[Dict[str, Any]]:
-        """Try comprehensive WAF bypass approaches with retry logic"""
-        max_retries = 2
+        """Try AWS WAF bypass with retries (only method that works)"""
+        max_retries = 3  # Increased to 3 for better success rate
         
         for attempt in range(max_retries):
             try:
-                logger.info(f"🔄 Attempt {attempt + 1}/{max_retries} - Attempting comprehensive WAF bypass...")
+                logger.info(f"🔄 Attempt {attempt + 1}/{max_retries} - Attempting AWS WAF bypass...")
                 
-                # Try multiple bypass techniques
-                bypass_techniques = [
-                    lambda: self._try_aws_waf_bypass(proxy_url, headers, method, data, existing_cookies),
-                    lambda: self._try_direct_bypass(proxy_url, headers),
-                    lambda: self._try_tesla_waf_bypass(proxy_url, headers)
-                ]
+                # Only use AWS WAF bypass - other methods (direct, tesla) just return 202
+                try:
+                    result = await self._try_aws_waf_bypass(proxy_url, headers, method, data, existing_cookies)
+                    if result:
+                        logger.info("✅ AWS WAF bypass successful!")
+                        extracted_result = self._extract_result_data(result)
+                        # Check if we got valid content
+                        if extracted_result and extracted_result.get('success') and len(extracted_result.get('content', '')) > 100:
+                            logger.info(f"✅ Retrieved valid content ({len(extracted_result.get('content', ''))} bytes)")
+                            return extracted_result
+                        else:
+                            logger.warning("⚠️ Bypass succeeded but returned invalid/empty content")
+                            # Retry AWS WAF bypass, don't try other techniques
+                except Exception as e:
+                    logger.warning(f"⚠️ AWS WAF bypass attempt {attempt + 1} failed: {e}")
                 
-                for technique in bypass_techniques:
-                    try:
-                        result = await technique()
-                        if result:
-                            logger.info("✅ WAF bypass successful!")
-                            extracted_result = self._extract_result_data(result)
-                            # Check if we got valid content
-                            if extracted_result and extracted_result.get('success') and len(extracted_result.get('content', '')) > 100:
-                                return extracted_result
-                            else:
-                                logger.warning("⚠️ Bypass succeeded but returned invalid content, trying next technique...")
-                                continue
-                    except Exception as e:
-                        logger.warning(f"⚠️ Bypass technique failed: {e}")
-                        continue
-                
-                # Try direct fallback if all techniques failed
-                logger.warning("⚠️ All bypass techniques failed, trying direct approach")
-                fallback_result = await self._try_direct_fallback(proxy_url, headers)
-                if fallback_result and fallback_result.get('success') and len(fallback_result.get('content', '')) > 100:
-                    return fallback_result
-                
-                # If all techniques failed in this attempt, wait before retry
+                # If AWS WAF bypass failed, wait before retry with progressive backoff
                 if attempt < max_retries - 1:
-                    logger.info(f"⏳ All techniques failed in attempt {attempt + 1}, waiting 3 seconds before retry...")
-                    await asyncio.sleep(3)
+                    wait_time = (attempt + 1) * 3  # 3s, 6s, 9s
+                    logger.info(f"⏳ Waiting {wait_time} seconds before retry {attempt + 2}/{max_retries}...")
+                    await asyncio.sleep(wait_time)
                 
             except Exception as e:
                 logger.error(f"❌ Error in attempt {attempt + 1}: {e}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(3)
+                    wait_time = (attempt + 1) * 3
+                    logger.info(f"⏳ Waiting {wait_time} seconds before retry...")
+                    await asyncio.sleep(wait_time)
         
-        logger.error(f"❌ All WAF bypass attempts failed after {max_retries} tries")
+        logger.error(f"❌ All AWS WAF bypass attempts failed after {max_retries} tries")
+        logger.error("💡 Possible issues: proxy timeout, IP blocked, rate limiting, or network issue")
         return None
     
     def _extract_result_data(self, result: str) -> Dict[str, Any]:

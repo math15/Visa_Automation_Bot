@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/enhanced-bls", tags=["Enhanced BLS"])
 router.include_router(account_router)
 router.include_router(account_management_router, prefix="/accounts", tags=["Account Management"])
 router.include_router(captcha_router)
-router.include_router(email_router)
+router.include_router(email_router, prefix="/email", tags=["Email Service"])
 router.include_router(health_router)
 
 # Global variables for captcha handling (needed by modular services)

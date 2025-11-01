@@ -236,7 +236,7 @@ class BrowserCaptchaSolver:
                     else:
                         # Wait for captcha images to load (20 seconds timeout - doubled from 10s)
                         await page.wait_for_selector('.captcha-image-container', timeout=20000)
-                        logger.info("✅ Captcha images loaded!")
+                    logger.info("✅ Captcha images loaded!")
                     
                 except Exception as e:
                     if manual_mode:

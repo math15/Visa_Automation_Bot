@@ -142,8 +142,9 @@ class MultiAccountBLSService:
                     password=account.password
                 )
                 
-                # Create BLS account
-                result = await self.bls_creator.create_account(account_data, db)
+                # Create BLS account using browser flow (RECOMMENDED - bypasses WAF)
+                # Use create_account_with_browser instead of create_account for better success rate
+                result = await self.bls_creator.create_account_with_browser(account_data, db)
                 
                 # Update account status based on result
                 if result.success:

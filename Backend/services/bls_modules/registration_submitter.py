@@ -207,25 +207,33 @@ class RegistrationSubmitter:
                 invalid_keys = ['path', 'samesite', 'domain', 'expires', 'max-age', 'secure', 'httponly']
                 cookies = {k: v for k, v in session_cookies.items() if k.lower() not in invalid_keys}
             
+            # Add visitorId_current if not present (REQUIRED by BLS!)
+            # This should come from the registration page cookies, but fallback to default if missing
+            if 'visitorId_current' not in cookies:
+                cookies['visitorId_current'] = '22615162'  # Fallback to default
+                logger.warning("⚠️ visitorId_current not found in cookies, using fallback: 22615162")
+            else:
+                logger.info(f"🆔 Using visitorId_current from cookies: {cookies['visitorId_current']}")
+            
             # Prepare proxy
             proxies = None
             if proxy_url:
-                if '@' in proxy_url:
+                # Remove http:// prefix if present (it will be added back)
+                clean_proxy = proxy_url.replace('http://', '').replace('https://', '')
+                
+                if '@' in clean_proxy:
                     # Format: username:password@host:port
-                    parts = proxy_url.split('@')
-                    auth = parts[0]
-                    host_port = parts[1]
                     proxies = {
-                        'http': f'http://{auth}@{host_port}',
-                        'https': f'http://{auth}@{host_port}'
+                        'http': f'http://{clean_proxy}',
+                        'https': f'http://{clean_proxy}'
                     }
                 else:
                     # Format: host:port
                     proxies = {
-                        'http': f'http://{proxy_url}',
-                        'https': f'http://{proxy_url}'
+                        'http': f'http://{clean_proxy}',
+                        'https': f'http://{clean_proxy}'
                     }
-                logger.info(f"🌐 Using proxy: {proxy_url[:50]}...")
+                logger.info(f"🌐 Using proxy: {proxies['http'][:70]}...")
             
             # URL encode form data
             encoded_data = urllib.parse.urlencode(form_data)
@@ -234,7 +242,7 @@ class RegistrationSubmitter:
             logger.info(f"📊 Form data fields: {list(form_data.keys())}")
             logger.info(f"📊 OTP value: {form_data.get('EmailOtp', 'N/A')}")
             
-            # Send request
+            # Send request (with WAF retry logic)
             response = session.post(
                 self.submit_url,
                 data=encoded_data,
@@ -248,31 +256,162 @@ class RegistrationSubmitter:
             logger.info(f"📡 Response status: {response.status_code}")
             logger.info(f"📡 Response headers: {dict(response.headers)}")
             
-            # Parse response
-            try:
-                response_json = response.json()
-                logger.info(f"📡 Response JSON: {response_json}")
+            # Check for AWS WAF challenge (status 202)
+            if response.status_code == 202:
+                logger.warning("⚠️ AWS WAF challenge detected (202)!")
+                logger.info("🔄 Need to solve fresh WAF challenge for final registration endpoint...")
                 
-                if response_json.get('success'):
-                    logger.info("✅ Final registration successful!")
-                    return {
-                        "success": True,
-                        "response": response_json
-                    }
-                else:
-                    logger.error(f"❌ Registration failed: {response_json}")
+                # Try to solve WAF challenge directly
+                try:
+                    response_text = response.text
+                    
+                    # Check if response body is empty (content-length: 0)
+                    if not response_text or len(response_text) < 100:
+                        logger.warning("⚠️ 202 response has empty body, need to GET the challenge page")
+                        logger.info("🔄 Making GET request to retrieve WAF challenge...")
+                        
+                        # Make a GET request to the same endpoint to get the challenge page
+                        import asyncio
+                        await asyncio.sleep(1)
+                        
+                        challenge_response = session.get(
+                            self.submit_url,
+                            headers=headers,
+                            cookies=cookies,
+                            proxies=proxies,
+                            timeout=30,
+                            allow_redirects=False
+                        )
+                        
+                        logger.info(f"📡 Challenge GET response status: {challenge_response.status_code}")
+                        logger.info(f"📡 Challenge response length: {len(challenge_response.text)}")
+                        response_text = challenge_response.text
+                    
+                    # Check if this is a WAF challenge page
+                    if 'gokuProps' in response_text or 'x-amzn-waf-action' in response.headers:
+                        logger.info("🔍 Detected WAF challenge in response, solving directly...")
+                        
+                        # Solve WAF challenge directly
+                        from awswaf.aws import AwsWaf
+                        import asyncio
+                        
+                        # Extract WAF challenge data
+                        logger.info("🔍 Extracting WAF challenge data from 202 response...")
+                        goku_props, host = AwsWaf.extract(response_text)
+                        
+                        if goku_props and host:
+                            logger.info(f"✅ Extracted WAF challenge data")
+                            logger.info(f"🔑 Host: {host[:50]}...")
+                            
+                            # Solve the challenge
+                            logger.info("🔄 Solving AWS WAF challenge...")
+                            waf_token = AwsWaf.solve_challenge(goku_props, host)
+                            logger.info(f"✅ Generated WAF token: {waf_token[:50]}...")
+                            
+                            # Update cookies with new token
+                            cookies['aws-waf-token'] = waf_token
+                            logger.info("🔑 Updated cookies with fresh WAF token")
+                            
+                            # Retry the final registration request with new token
+                            logger.info("🔄 Retrying final registration with fresh WAF token...")
+                            await asyncio.sleep(2)
+                            
+                            response = session.post(
+                                self.submit_url,
+                                data=encoded_data,
+                                headers=headers,
+                                cookies=cookies,
+                                proxies=proxies,
+                                timeout=30,
+                                allow_redirects=False
+                            )
+                            
+                            logger.info(f"📡 Retry response status: {response.status_code}")
+                        else:
+                            logger.error("❌ Failed to extract WAF challenge data")
+                            logger.warning("⚠️ Trying simple retry...")
+                            import asyncio
+                            await asyncio.sleep(2)
+                            
+                            response = session.post(
+                                self.submit_url,
+                                data=encoded_data,
+                                headers=headers,
+                                cookies=cookies,
+                                proxies=proxies,
+                                timeout=30,
+                                allow_redirects=False
+                            )
+                            
+                            logger.info(f"📡 Simple retry response status: {response.status_code}")
+                    else:
+                        logger.warning("⚠️ 202 response but no WAF challenge detected, retrying...")
+                        import asyncio
+                        await asyncio.sleep(2)
+                        
+                        response = session.post(
+                            self.submit_url,
+                            data=encoded_data,
+                            headers=headers,
+                            cookies=cookies,
+                            proxies=proxies,
+                            timeout=30,
+                            allow_redirects=False
+                        )
+                        
+                        logger.info(f"📡 Retry response status: {response.status_code}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error handling WAF challenge: {e}")
+                    logger.warning("⚠️ Attempting simple retry...")
+                    import asyncio
+                    await asyncio.sleep(2)
+                    
+                    response = session.post(
+                        self.submit_url,
+                        data=encoded_data,
+                        headers=headers,
+                        cookies=cookies,
+                        proxies=proxies,
+                        timeout=30,
+                        allow_redirects=False
+                    )
+                    
+                    logger.info(f"📡 Fallback retry response status: {response.status_code}")
+            
+            # Parse response
+            if response.status_code == 200:
+                try:
+                    response_json = response.json()
+                    logger.info(f"📡 Response JSON: {response_json}")
+                    
+                    if response_json.get('success'):
+                        logger.info("✅ Final registration successful!")
+                        return {
+                            "success": True,
+                            "response": response_json
+                        }
+                    else:
+                        logger.error(f"❌ Registration failed: {response_json}")
+                        return {
+                            "success": False,
+                            "error": response_json.get('error', 'Unknown error'),
+                            "response": response_json
+                        }
+                except Exception as e:
+                    logger.error(f"❌ Error parsing response: {e}")
+                    logger.info(f"📡 Raw response: {response.text[:500]}")
                     return {
                         "success": False,
-                        "error": response_json.get('error', 'Unknown error'),
-                        "response": response_json
+                        "error": f"Failed to parse response: {e}",
+                        "raw_response": response.text
                     }
-                    
-            except Exception as e:
-                logger.error(f"❌ Error parsing response: {e}")
-                logger.info(f"📡 Raw response: {response.text[:500]}")
+            else:
+                logger.error(f"❌ HTTP {response.status_code}")
+                logger.error(f"📄 Response text: {response.text[:500]}")
                 return {
                     "success": False,
-                    "error": f"Failed to parse response: {e}",
+                    "error": f"HTTP {response.status_code}",
                     "raw_response": response.text
                 }
             
