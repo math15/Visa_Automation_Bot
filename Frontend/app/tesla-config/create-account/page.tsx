@@ -14,13 +14,9 @@ import {
   FileText, 
   MapPin, 
   Flag, 
-  Shield,
   CheckCircle,
   AlertCircle,
   Loader2,
-  Eye,
-  EyeOff,
-  Key,
   UserPlus,
   Save
 } from 'lucide-react';
@@ -93,8 +89,8 @@ export default function CreateAccountPage() {
     NumberOfMembers: 1,
     Relationship: 'Self',
     PrimaryApplicant: true,
-    Password: '',
-    ConfirmPassword: ''
+    Password: 'Supersecret123@',  // Hidden default password
+    ConfirmPassword: 'Supersecret123@'  // Hidden default password
   });
 
   // Auto-generate credentials on component mount
@@ -156,14 +152,13 @@ export default function CreateAccountPage() {
       });
     } else {
       // Only auto-generate credentials for new accounts
-      generateCredentials();
+      // DISABLED: User will manually input email
+      // generateCredentials();
     }
   }, []);
 
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Captcha solver state
 
@@ -400,69 +395,10 @@ export default function CreateAccountPage() {
 
   const generateSampleData = async () => {
     // Generate complete sample data with all required fields
-    const timestamp = Date.now();
-    let sampleEmail = `ahmed.benali${timestamp}@example.com`;  // Fallback
-    let inboxUrl = '';
-    
-    // Try to generate REAL temporary email from backend
-    try {
-      const response = await fetch('http://localhost:8000/api/enhanced-bls/email/generate-real-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.email) {
-          sampleEmail = data.email;
-          console.log(`✅ Generated REAL temporary email: ${sampleEmail}`);
-          console.log(`📧 Service: ${data.service_name}`);
-          
-          // Use inbox URL from backend response
-          inboxUrl = data.inbox_url || '';
-          
-          // Create service-specific message
-          let serviceMessage = '';
-          if (data.service_name === 'mailtm') {
-            serviceMessage = '🎉 Mail.tm (FREE) - Automatic OTP retrieval enabled!';
-          } else if (data.service_name === 'tempmail_io') {
-            serviceMessage = '💎 Temp-Mail.io (Premium) - Automatic OTP retrieval enabled!';
-          } else {
-            serviceMessage = '📧 Temporary email generated - Check inbox for OTP';
-          }
-          
-          // Show success toast
-          addToast({
-            type: 'success',
-            title: '✅ Real Temporary Email Generated!',
-            description: `${serviceMessage}\n📧 ${sampleEmail}${inboxUrl ? '\n🌐 Inbox: ' + inboxUrl : ''}`
-          });
-          
-          console.log(`🌐 Inbox URL: ${inboxUrl || 'N/A (automatic retrieval)'}`);
-          console.log(`💡 Service: ${data.service_name}`);
-        }
-      } else {
-        console.warn('⚠️ Failed to generate real email from backend, using fallback');
-        addToast({
-          type: 'warning',
-          title: '⚠️ Fallback Email Used',
-          description: 'Using @example.com. Backend email service unavailable.'
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error generating real email:', error);
-      console.log('⚠️ Using fallback email (@example.com)');
-      addToast({
-        type: 'warning',
-        title: '⚠️ Fallback Email Used',
-        description: 'Backend not responding. Manual OTP entry will be required.'
-      });
-    }
-    
     // Generate random 9-digit passport number (as required by BLS)
     const randomPassportNumber = Math.floor(100000000 + Math.random() * 900000000).toString();
+    // Generate random 9-digit mobile number
+    const randomMobileNumber = Math.floor(100000000 + Math.random() * 900000000).toString();
     
     const sampleData: FormData = {
       SurName: 'Benali',  // BLS: SurName (Family Name)
@@ -477,8 +413,8 @@ export default function CreateAccountPage() {
       PassportExpiryDate: '2030-01-15',
       PassportIssuePlace: 'Algiers',  // BLS: Required!
       PassportIssueCountry: 'Algeria',
-      Email: sampleEmail,  // REAL temporary email or fallback
-      Mobile: '555123456',  // Valid format (no leading 0, 8-10 digits)
+      Email: '',  // Empty - user must input email manually
+      Mobile: randomMobileNumber,  // Random 9-digit number
       PhoneCountryCode: '+213',
       BirthCountry: 'Algeria',
       CountryOfResidence: 'Algeria',
@@ -486,11 +422,17 @@ export default function CreateAccountPage() {
       NumberOfMembers: 1,
       Relationship: 'Self',
       PrimaryApplicant: true,
-      Password: 'SecurePass123!',
-      ConfirmPassword: 'SecurePass123!'
+      Password: 'Supersecret123@',  // Hidden default password
+      ConfirmPassword: 'Supersecret123@'  // Hidden default password
     };
     
     setFormData(sampleData);  // Replace entire form data
+    
+    addToast({
+      type: 'info',
+      title: 'Sample Data Loaded',
+      description: 'Please enter email manually before creating account. Password is auto-set.'
+    });
   };
 
   const generateEmail = () => {
@@ -861,26 +803,15 @@ Please check if the backend is running on http://localhost:8000`);
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="Email">Email Address * (Auto-Generated)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="Email"
-                    type="email"
-                    value={formData.Email}
-                    onChange={(e) => handleInputChange('Email', e.target.value)}
-                    className={`${errors.Email ? 'border-red-500' : ''} bg-muted`}
-                    placeholder="Email will be generated automatically"
-                    disabled
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={generateEmail}
-                    className="px-3"
-                  >
-                    <Mail className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Label htmlFor="Email">Email Address *</Label>
+                <Input
+                  id="Email"
+                  type="email"
+                  value={formData.Email}
+                  onChange={(e) => handleInputChange('Email', e.target.value)}
+                  className={errors.Email ? 'border-red-500' : ''}
+                  placeholder="Enter your email address"
+                />
                 {errors.Email && (
                   <p className="text-sm text-red-500 flex items-center gap-1">
                     <AlertCircle className="h-4 w-4" />
@@ -888,7 +819,7 @@ Please check if the backend is running on http://localhost:8000`);
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Tesla 2.0 compatible email auto-generated on page load
+                  Enter the email address you want to use for this account
                 </p>
               </div>
 
@@ -955,95 +886,6 @@ Please check if the backend is running on http://localhost:8000`);
                   value={formData.CountryOfResidence}
                   onChange={(e) => handleInputChange('CountryOfResidence', e.target.value)}
                 />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Account Credentials */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Account Credentials
-            </CardTitle>
-            <CardDescription>
-              Create secure login credentials for your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="Password">Password * (Auto-Generated)</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="Password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.Password}
-                      onChange={(e) => handleInputChange('Password', e.target.value)}
-                      className={`${errors.Password ? 'border-red-500' : ''} bg-muted`}
-                      placeholder="Password will be generated automatically"
-                      disabled
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={generatePassword}
-                    className="px-3"
-                  >
-                    <Key className="h-4 w-4" />
-                  </Button>
-                </div>
-                {errors.Password && (
-                  <p className="text-sm text-red-500 flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.Password}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Tesla 2.0 compatible password (same for all accounts)
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ConfirmPassword">Confirm Password * (Auto-Generated)</Label>
-                <div className="relative">
-                  <Input
-                    id="ConfirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={formData.ConfirmPassword}
-                    onChange={(e) => handleInputChange('ConfirmPassword', e.target.value)}
-                    className={`${errors.ConfirmPassword ? 'border-red-500' : ''} bg-muted`}
-                    placeholder="Password confirmation auto-generated"
-                    disabled
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {errors.ConfirmPassword && (
-                  <p className="text-sm text-red-500 flex items-center gap-1">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.ConfirmPassword}
-                  </p>
-                )}
               </div>
             </div>
           </CardContent>

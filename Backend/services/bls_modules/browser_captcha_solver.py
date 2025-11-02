@@ -102,7 +102,8 @@ class BrowserCaptchaSolver:
                         '--disable-component-update',
                         '--disable-domain-reliability',
                         '--disable-features=AudioServiceOutOfProcess',
-                        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+                        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+                        '--window-size=1,1'  # 1x1 pixel window
                     ]
                 }
                 
@@ -126,7 +127,7 @@ class BrowserCaptchaSolver:
                 
                 # Create context with proxy and viewport settings
                 context_options = {
-                    'viewport': {'width': 500, 'height': 600},  # Small window like iframe
+                    'viewport': {'width': 1, 'height': 1},  # 1x1 pixel viewport
                     'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
                     'locale': 'es-ES',
                     'timezone_id': 'Europe/Madrid',

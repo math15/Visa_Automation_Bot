@@ -49,10 +49,20 @@ class BrowserLoginHandler:
             logger.info("🚀 Step 0: Launching browser...")
             playwright = await async_playwright().start()
             
-            # Configure browser with proxy
+            # Configure browser with stealth settings
+            browser_args = [
+                '--disable-blink-features=AutomationControlled',
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+                f'--window-size=1,1',  # 1x1 pixel window
+            ]
+            
             browser_options = {
                 'headless': headless,
-                'timeout': 30000
+                'args': browser_args
             }
             
             if proxy_url:
@@ -62,11 +72,66 @@ class BrowserLoginHandler:
                 logger.info(f"🌐 Using proxy: {proxy_parts['server']}")
             
             self.browser = await playwright.chromium.launch(**browser_options)
-            self.context = await self.browser.new_context(
-                viewport={'width': 1366, 'height': 768},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
-            )
+            
+            # Create context with comprehensive anti-bot headers
+            context_options = {
+                'viewport': {'width': 1, 'height': 1},  # 1x1 pixel viewport
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'locale': 'es-ES',
+                'timezone_id': 'Europe/Madrid',
+                'permissions': [],
+                'extra_http_headers': {
+                    'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Cache-Control': 'max-age=0',
+                    'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                    'Sec-Ch-Ua-Mobile': '?0',
+                    'Sec-Ch-Ua-Platform': '"Windows"',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Upgrade-Insecure-Requests': '1',
+                    'DNT': '1',
+                }
+            }
+            
+            self.context = await self.browser.new_context(**context_options)
             self.page = await self.context.new_page()
+            
+            # Add comprehensive stealth JavaScript (anti-bot detection)
+            await self.page.add_init_script("""
+                // Remove webdriver flag
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                
+                // Add realistic plugins
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [
+                        {name: 'Chrome PDF Plugin', description: 'Portable Document Format', filename: 'internal-pdf-viewer'},
+                        {name: 'Chrome PDF Viewer', description: '', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai'},
+                        {name: 'Native Client', description: '', filename: 'internal-nacl-plugin'}
+                    ]
+                });
+                
+                // Set Spanish locale
+                Object.defineProperty(navigator, 'languages', {get: () => ['es-ES', 'es', 'en-US', 'en']});
+                Object.defineProperty(navigator, 'language', {get: () => 'es-ES'});
+                
+                // Add realistic screen resolution
+                Object.defineProperty(screen, 'width', {get: () => 1920});
+                Object.defineProperty(screen, 'height', {get: () => 1080});
+                Object.defineProperty(screen, 'availWidth', {get: () => 1920});
+                Object.defineProperty(screen, 'availHeight', {get: () => 1040});
+                
+                // Override permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+            """)
             
             # Add initial cookies
             if cookies:
@@ -83,27 +148,69 @@ class BrowserLoginHandler:
             
             # Step 1: Navigate to login page and handle AWS WAF
             logger.info("🔍 Step 1: Navigating to login page...")
-            response = await self.page.goto(login_url, wait_until='domcontentloaded', timeout=60000)
-            
-            if not response or response.status != 200:
-                logger.error(f"❌ Failed to load login page: {response.status if response else 'timeout'}")
+            logger.info("💡 Browser will handle AWS WAF challenges automatically...")
+            logger.info("⏳ This may take 1-3 minutes while WAF challenge is being solved...")
+            try:
+                # Use 'commit' instead of 'domcontentloaded' to allow WAF challenge to process
+                response = await self.page.goto(login_url, wait_until='commit', timeout=180000)  # 3 minutes timeout
+                logger.info(f"📡 Initial navigation committed with status: {response.status if response else 'unknown'}")
+                
+                # Wait for page to actually load after navigation (WAF might be processing)
+                logger.info("⏳ Waiting for page to load completely (WAF might be processing)...")
+                max_wait = 180  # 3 minutes
+                wait_interval = 5  # 5 seconds
+                elapsed = 0
+                form_loaded = False
+                
+                while elapsed < max_wait:
+                    await asyncio.sleep(wait_interval)
+                    elapsed += wait_interval
+                    
+                    # Check if page has loaded by looking for the Verify button
+                    try:
+                        form_visible = await self.page.query_selector('#btnVerify')
+                        if form_visible:
+                            logger.info(f"✅ Login page loaded successfully after {elapsed}s!")
+                            form_loaded = True
+                            break
+                        else:
+                            # Check current URL to see if still on WAF challenge
+                            current_url = self.page.url
+                            if 'Login' in current_url:
+                                logger.info(f"⏳ WAF challenge still processing... ({elapsed}s / {max_wait}s)")
+                            else:
+                                logger.info(f"⏳ Waiting for page... ({elapsed}s / {max_wait}s)")
+                    except Exception as e:
+                        logger.info(f"⏳ Still loading... ({elapsed}s / {max_wait}s)")
+                
+                # Final check
+                if not form_loaded:
+                    logger.error("❌ Login page did not load after 3 minutes")
+                    # Try to get current page info for debugging
+                    try:
+                        current_url = self.page.url
+                        logger.error(f"❌ Current URL: {current_url}")
+                        page_title = await self.page.title()
+                        logger.error(f"❌ Page title: {page_title}")
+                    except:
+                        pass
+                    raise Exception("Page load timeout - WAF challenge may have failed")
+                
+                # Check for 403 error in page content
+                try:
+                    page_content = await self.page.content()
+                    if '403' in page_content and 'ERROR' in page_content.upper():
+                        logger.error("❌ Got 403 Forbidden in page content - CloudFront blocked the request")
+                        logger.info("💡 This usually means: proxy is blocked, rate limiting, or IP banned")
+                        raise Exception("CloudFront 403 error")
+                except Exception as e:
+                    if "403" in str(e):
+                        raise
+                        
+            except Exception as e:
+                logger.error(f"❌ Error loading login page: {e}")
                 await self.browser.close()
-                return False, {'error': 'Failed to load login page'}
-            
-            logger.info(f"✅ Login page loaded: {response.status}")
-            
-            # Handle AWS WAF challenge if present
-            page_content = await self.page.content()
-            if 'x-amzn-waf-action' in response.headers or 'challenge-platform' in page_content:
-                logger.info("🛡️ AWS WAF challenge detected, solving...")
-                waf_solved = await self._handle_waf_challenge()
-                if not waf_solved:
-                    logger.error("❌ Failed to solve AWS WAF challenge")
-                    await self.browser.close()
-                    return False, {'error': 'WAF challenge failed'}
-            
-            # Wait for page to fully load
-            await asyncio.sleep(3)
+                return False, {'error': f'Failed to load login page: {str(e)}'}
             
             # Step 2: Fill email address
             logger.info("📝 Step 2: Filling email address...")
@@ -114,12 +221,61 @@ class BrowserLoginHandler:
                 await self.browser.close()
                 return False, {'error': 'Failed to fill email'}
             
-            # Step 3: Click Verify button (this triggers captcha)
+            # Step 3: Click Verify button (this navigates to captcha page)
             logger.info("🔍 Step 3: Clicking Verify button...")
             await self._click_verify_button()
             
-            # Step 4: Automatically solve captcha
-            logger.info("🤖 Step 4: Automatically solving captcha with NoCaptchaAI...")
+            # Step 4: Get password from user input (if not provided) - password is sent to email after clicking Verify
+            if not password:
+                logger.info("")
+                logger.info("="*80)
+                logger.info("🔒 MANUAL PASSWORD ENTRY REQUIRED")
+                logger.info("="*80)
+                logger.info(f"📧 Email: {email}")
+                logger.info("💡 Password/OTP has been sent to your email")
+                logger.info("💡 Please check your email and enter the password/OTP in the console below:")
+                logger.info("="*80)
+                logger.info("")
+                
+                # Simple console input using threading
+                import threading
+                password_received = threading.Event()
+                user_password = [None]
+                
+                def get_console_input():
+                    try:
+                        pwd = input(f"🔒 Please enter password/OTP received at {email}: ").strip()
+                        user_password[0] = pwd
+                        password_received.set()
+                    except:
+                        pass
+                
+                input_thread = threading.Thread(target=get_console_input)
+                input_thread.daemon = True
+                input_thread.start()
+                
+                # Wait for user input (with timeout)
+                password_received.wait(timeout=300)  # 5 minutes timeout
+                password = user_password[0]
+                
+                if not password:
+                    logger.error("❌ No password received - timeout or no input")
+                    await self.browser.close()
+                    return False, {'error': 'Password timeout'}
+                
+                logger.info("✅ Password received")
+            
+            # Step 5: Fill password on the captcha page
+            logger.info("🔐 Step 5: Filling password on captcha page...")
+            password_filled = await self._fill_password(password)
+            
+            if not password_filled:
+                logger.error("❌ Failed to fill password")
+                await self.browser.close()
+                return False, {'error': 'Failed to fill password'}
+            
+            # Step 6: Automatically solve captcha on the captcha page
+            logger.info("🤖 Step 6: Automatically solving captcha with NoCaptchaAI...")
             captcha_result = await self._solve_captcha_automatically()
             
             if not captcha_result:
@@ -129,29 +285,15 @@ class BrowserLoginHandler:
             
             logger.info("✅ Captcha solved successfully!")
             
-            # Step 5: Wait for password field to appear
-            logger.info("🔒 Step 5: Waiting for password field...")
-            password_appeared = await self._wait_for_password_field()
-            
-            if not password_appeared:
-                logger.error("❌ Password field did not appear")
-                await self.browser.close()
-                return False, {'error': 'Password field not found'}
-            
-            # Step 6: Fill password and submit
-            logger.info("🔐 Step 6: Filling password and submitting...")
-            login_success = await self._fill_password_and_submit(password)
-            
-            if not login_success:
-                logger.error("❌ Login failed")
-                await self.browser.close()
-                return False, {'error': 'Login failed'}
-            
-            logger.info("✅ Login successful!")
-            
             # Step 7: Extract session cookies
             logger.info("🍪 Step 7: Extracting session cookies...")
             session_cookies = await self._extract_session_cookies()
+            
+            # Keep browser open for 1 minute for inspection
+            logger.info("")
+            logger.info("⏳ Keeping browser open for 60 seconds for inspection...")
+            await asyncio.sleep(60)
+            logger.info("✅ Inspection complete")
             
             await self.browser.close()
             await playwright.stop()
@@ -195,36 +337,51 @@ class BrowserLoginHandler:
     async def _fill_email(self, email: str) -> bool:
         """Fill email address in the login form"""
         try:
-            # Try to find email input field
-            # The user said: <input autocomplete="off" id="ldmao" name="ldmao"
-            email_selectors = [
-                '#ldmao',
-                'input[name="ldmao"]',
-                'input[type="text"]',
-                'input[name*="email"]',
-                'input[id*="email"]'
-            ]
+            # The IDs change dynamically, so we need to find the visible input field using JavaScript
+            logger.info("🔍 Searching for visible email input field...")
             
-            for selector in email_selectors:
-                try:
-                    email_field = await self.page.wait_for_selector(selector, timeout=5000)
-                    if email_field:
-                        await email_field.fill(email)
-                        logger.info(f"✅ Filled email: {email}")
-                        await asyncio.sleep(1)  # Small delay
-                        return True
-                except:
-                    continue
+            # Use JavaScript to find the visible input field (check parent div's computed style and dimensions)
+            visible_field_id = await self.page.evaluate("""
+                () => {
+                    // Get all text inputs in the form
+                    const inputs = document.querySelectorAll('input[type="text"].entry-disabled');
+                    for (let input of inputs) {
+                        // Check the parent div's computed style and dimensions
+                        const parentDiv = input.closest('.mb-3');
+                        if (parentDiv) {
+                            const style = window.getComputedStyle(parentDiv);
+                            // Check if parent is visible (display, visibility, and dimensions)
+                            const isVisible = style.display !== 'none' && 
+                                            style.visibility !== 'hidden' &&
+                                            parentDiv.offsetWidth > 0 && 
+                                            parentDiv.offsetHeight > 0;
+                            
+                            if (isVisible) {
+                                console.log(`Found visible input: ${input.id}`);
+                                return input.id;
+                            }
+                        }
+                    }
+                    return null;
+                }
+            """)
             
-            logger.error("❌ Could not find email input field")
-            return False
+            if visible_field_id:
+                logger.info(f"✅ Found visible email input field with ID: {visible_field_id}")
+                await self.page.fill(f'#{visible_field_id}', email)
+                logger.info(f"✅ Filled email: {email}")
+                await asyncio.sleep(1)
+                return True
+            else:
+                logger.error("❌ Could not find visible email input field")
+                return False
             
         except Exception as e:
             logger.error(f"❌ Error filling email: {e}")
             return False
     
     async def _click_verify_button(self):
-        """Click the Verify button"""
+        """Click the Verify button and wait for navigation to captcha page"""
         try:
             # User said: <button class="btn btn-primary" id="btnVerify" onclick="return OnSubmitVerify();">Verify</button>
             verify_selectors = [
@@ -240,7 +397,19 @@ class BrowserLoginHandler:
                     if verify_button:
                         await verify_button.click()
                         logger.info("✅ Clicked Verify button")
-                        await asyncio.sleep(2)  # Wait for captcha to load
+                        
+                        # Wait for navigation to captcha page (URL contains "logincaptcha")
+                        logger.info("⏳ Waiting for navigation to captcha page...")
+                        await asyncio.sleep(3)  # Give it time to redirect
+                        
+                        # Wait for navigation
+                        try:
+                            await self.page.wait_for_url('**/logincaptcha**', timeout=10000)
+                            logger.info("✅ Navigated to captcha page")
+                        except:
+                            logger.info("ℹ️ Navigation timeout or captcha on same page, continuing...")
+                        
+                        await asyncio.sleep(2)  # Additional wait for captcha to load
                         return
                 except:
                     continue
@@ -255,31 +424,34 @@ class BrowserLoginHandler:
         try:
             logger.info("🔍 Looking for captcha iframe...")
             iframe_element = None
+            captcha_frame = None
             
             try:
-                # Wait for iframe to be present
-                iframe_element = await self.page.wait_for_selector('iframe.k-content-frame', timeout=10000)
+                # Wait for iframe to be present (registration uses iframe)
+                iframe_element = await self.page.wait_for_selector('iframe.k-content-frame', timeout=30000)
                 logger.info("✅ Found captcha iframe")
+                
+                # Get the frame from the iframe element
+                captcha_frame = await iframe_element.content_frame()
+                if not captcha_frame:
+                    logger.error("❌ Could not access iframe content")
+                    return False
+                
+                logger.info("✅ Switched to captcha iframe context")
+                frame_type = "iframe"
             except Exception as e:
-                logger.error(f"❌ Captcha iframe not found: {e}")
-                return False
-            
-            # Get the frame from the iframe element
-            captcha_frame = await iframe_element.content_frame()
-            if not captcha_frame:
-                logger.error("❌ Could not access iframe content")
-                return False
-            
-            logger.info("✅ Switched to captcha iframe context")
+                logger.info(f"ℹ️ No iframe found, captcha is on main page: {e}")
+                captcha_frame = self.page  # Use main page
+                frame_type = "main_page"
             
             # Wait for captcha to fully load (same logic as registration)
             logger.info("⏳ Waiting for captcha to fully load...")
             await asyncio.sleep(5)  # Wait for 54 images + CSS + positioning
             
             # Wait additional time
-            logger.info("⏳ Waiting 5 more seconds to ensure iframe is fully settled...")
+            logger.info("⏳ Waiting 5 more seconds to ensure captcha is fully settled...")
             await asyncio.sleep(5)
-            logger.info("✅ Captcha iframe should now be fully ready!")
+            logger.info(f"✅ Captcha should now be fully ready ({frame_type})!")
             
             # Extract captcha question and images
             logger.info("📸 Extracting captcha images and question...")
@@ -387,7 +559,7 @@ class BrowserLoginHandler:
                     logger.error("❌ No base64 images found")
                     return False
                 
-                solution = await captcha_service.solve_bls_images(question, image_bases)
+                solution = await captcha_service.solve_bls_images(image_bases)
                 
                 if not solution:
                     logger.error("❌ NoCaptchaAI failed to solve captcha")
@@ -401,25 +573,49 @@ class BrowserLoginHandler:
             
             # Click matching images
             logger.info("🖱️ Clicking matching images...")
-            target_number = question.strip()
+            
+            # Parse question to extract target number
+            import re
+            number_match = re.search(r'number\s+(\d+)', question, re.IGNORECASE)
+            
+            if not number_match:
+                logger.error(f"❌ Could not parse target number from question: {question}")
+                return False
+            
+            target_number = number_match.group(1)
+            logger.info(f"🎯 Target number from question: {target_number}")
             
             # Get image texts from solution
-            if isinstance(solution, str):
+            if isinstance(solution, list):
+                image_texts = solution
+            elif isinstance(solution, str):
                 # Most numbers are 3 digits
                 image_texts = [solution[i:i+3] for i in range(0, len(solution), 3)]
             else:
                 logger.error(f"❌ Unexpected solution format: {type(solution)}")
                 return False
             
+            # Log all extracted texts with their grid positions and IDs
+            logger.info(f"📋 All extracted image texts:")
+            for idx, text in enumerate(image_texts):
+                captcha_id = images[idx]['captchaId'] if idx < len(images) else 'unknown'
+                logger.info(f"   Grid {idx} (ID: {captcha_id}): '{text}'")
+            
             # Find indices of matching images
             correct_indices = []
             for idx, text in enumerate(image_texts):
                 if text.strip() == target_number:
                     correct_indices.append(idx)
+                    captcha_id = images[idx]['captchaId'] if idx < len(images) else 'unknown'
+                    logger.info(f"✅ Grid position {idx} (ID: {captcha_id}) matches target: {text}")
             
             if not correct_indices:
                 logger.warning(f"⚠️ No matching images found for target {target_number}")
+                logger.info(f"📊 Summary: Target='{target_number}', Extracted={image_texts}")
                 return False
+            
+            logger.info(f"✅ Found {len(correct_indices)} matching images")
+            logger.info(f"📊 Will click {len(correct_indices)} out of 9 total images (only the ones matching '{target_number}')")
             
             # Click matching images using captcha IDs
             captcha_ids_to_click = []
@@ -427,7 +623,7 @@ class BrowserLoginHandler:
                 if idx < len(images):
                     captcha_id = images[idx]['captchaId']
                     captcha_ids_to_click.append(captcha_id)
-                    logger.info(f"   Will click captcha ID: {captcha_id}")
+                    logger.info(f"   Grid {idx} (text='{image_texts[idx]}') → Captcha ID: {captcha_id}")
             
             for captcha_id in captcha_ids_to_click:
                 try:
@@ -464,27 +660,19 @@ class BrowserLoginHandler:
             # Wait before clicking submit
             await asyncio.sleep(1)
             
-            # Click submit button
-            logger.info("🖱️ Clicking captcha submit button...")
+            # Click form submit button (which submits BOTH password and captcha together)
+            logger.info("🖱️ Clicking form submit button to submit password + captcha...")
             submit_clicked = await captcha_frame.evaluate("""
                 () => {
-                    let submitButton = document.querySelector('#submit');
+                    // Try to find the form submit button #btnVerify
+                    let submitButton = document.querySelector('#btnVerify');
                     if (!submitButton) {
-                        submitButton = document.querySelector('#captchaForm .img-actions > div:nth-child(3)');
-                    }
-                    if (!submitButton) {
-                        submitButton = document.querySelector('.img-action.img-active[title="Submit Selection"]');
+                        // Fallback to form submit button
+                        submitButton = document.querySelector('#captchaForm button[type="submit"]');
                     }
                     if (submitButton) {
-                        const events = ['mouseover', 'mousedown', 'mouseup', 'click'];
-                        events.forEach(eventType => {
-                            const event = new MouseEvent(eventType, {
-                                bubbles: true,
-                                cancelable: true,
-                                view: window
-                            });
-                            submitButton.dispatchEvent(event);
-                        });
+                        // Just click it normally - the onclick="return onSubmit()" handler will do the rest
+                        submitButton.click();
                         return true;
                     }
                     return false;
@@ -492,13 +680,13 @@ class BrowserLoginHandler:
             """)
             
             if submit_clicked:
-                logger.info("✅ Clicked submit button")
+                logger.info("✅ Clicked form submit button")
             else:
-                logger.warning("⚠️ Submit button not found")
+                logger.warning("⚠️ Form submit button not found")
             
             await asyncio.sleep(2)  # Wait for submission
             
-            # Verify captcha was solved
+            # Verify captcha was solved (check if we navigated away from captcha page)
             captcha_solved = await self._verify_captcha_solved()
             
             if captcha_solved:
@@ -522,16 +710,23 @@ class BrowserLoginHandler:
             
             while waited < max_wait:
                 try:
-                    # Check if password field appeared (means captcha passed)
-                    has_password_field = await self.page.evaluate("""
+                    # Check if we navigated away from captcha page (success)
+                    current_url = self.page.url
+                    if 'logincaptcha' not in current_url:
+                        logger.info("✅ Navigated away from captcha page - login successful!")
+                        await asyncio.sleep(1)
+                        return True
+                    
+                    # Check if captcha images disappeared (captcha solved, but still on same page)
+                    captcha_gone = await self.page.evaluate("""
                         () => {
-                            const passwordField = document.querySelector('input[type="password"]');
-                            return passwordField !== null;
+                            const captchaImages = document.querySelectorAll('.captcha-img');
+                            return captchaImages.length === 0;
                         }
                     """)
                     
-                    if has_password_field:
-                        logger.info("✅ Password field appeared - captcha solved!")
+                    if captcha_gone:
+                        logger.info("✅ Captcha images disappeared - captcha solved!")
                         await asyncio.sleep(1)
                         return True
                     
@@ -553,64 +748,65 @@ class BrowserLoginHandler:
         try:
             logger.info(f"⏳ Waiting for password field (max {timeout}s)...")
             
+            # Use Playwright's is_visible() to find visible password fields
             password_selectors = [
-                'input[type="password"]',
-                'input[name*="password"]',
-                'input[id*="password"]'
+                'input[type="password"].form-control.entry-disabled',
+                'input[type="password"]'
             ]
             
-            for selector in password_selectors:
-                try:
-                    await self.page.wait_for_selector(selector, timeout=timeout)
-                    logger.info(f"✅ Password field found: {selector}")
-                    return True
-                except:
-                    continue
+            waited = 0
+            check_interval = 0.5
             
-            logger.error("❌ Password field not found")
+            while waited < timeout:
+                for selector in password_selectors:
+                    try:
+                        elements = await self.page.query_selector_all(selector)
+                        for element in elements:
+                            if await element.is_visible():
+                                logger.info(f"✅ Password field found and visible: {selector}")
+                                return True
+                    except:
+                        continue
+                
+                await asyncio.sleep(check_interval)
+                waited += check_interval
+            
+            logger.error("❌ Password field not found or not visible")
             return False
             
         except Exception as e:
             logger.error(f"❌ Error waiting for password field: {e}")
             return False
     
-    async def _fill_password_and_submit(self, password: str) -> bool:
-        """Fill password field and submit login form"""
+    async def _fill_password(self, password: str) -> bool:
+        """Fill password field on captcha page"""
         try:
-            # Find password field
-            password_field = await self.page.query_selector('input[type="password"]')
-            if not password_field:
-                logger.error("❌ Password field not found")
+            # Find visible password field using the same approach as email
+            logger.info("🔍 Searching for visible password input field using Playwright's is_visible()...")
+            
+            # Get all potential password fields
+            potential_password_inputs = await self.page.query_selector_all('input[type="password"].form-control.entry-disabled')
+            
+            visible_field_id = None
+            for input_element in potential_password_inputs:
+                # Use Playwright's built-in is_visible() method
+                if await input_element.is_visible():
+                    visible_field_id = await input_element.get_attribute('id')
+                    if visible_field_id:
+                        break
+            
+            if visible_field_id:
+                logger.info(f"✅ Found visible password input field with ID: {visible_field_id}")
+                await self.page.fill(f'#{visible_field_id}', password)
+                logger.info("✅ Filled password")
+                await asyncio.sleep(1)
+                return True
+            else:
+                logger.error("❌ Could not find any visible password input field")
                 return False
             
-            await password_field.fill(password)
-            logger.info("✅ Filled password")
-            await asyncio.sleep(1)
-            
-            # Find and click submit button
-            submit_selectors = [
-                'button[type="submit"]',
-                'button.btn-primary',
-                'input[type="submit"]',
-                'button#btnLogin'
-            ]
-            
-            for selector in submit_selectors:
-                try:
-                    submit_button = await self.page.query_selector(selector)
-                    if submit_button:
-                        await submit_button.click()
-                        logger.info("✅ Clicked submit button")
-                        await asyncio.sleep(3)
-                        return True
-                except:
-                    continue
-            
-            logger.error("❌ Submit button not found")
-            return False
-            
         except Exception as e:
-            logger.error(f"❌ Error filling password and submitting: {e}")
+            logger.error(f"❌ Error filling password: {e}")
             return False
     
     async def _extract_session_cookies(self) -> Dict[str, str]:

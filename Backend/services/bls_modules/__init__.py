@@ -150,7 +150,7 @@ class BLSAccountCreator:
                 user_data=user_data,
                 cookies=session_cookies,
                 proxy_url=proxy_url,
-                headless=False,  # Show browser window
+                headless=True,  # Run in background
                 email_service=email_service,
                 email_service_name=email_service_name  # Pass service name for OTP retrieval
             )

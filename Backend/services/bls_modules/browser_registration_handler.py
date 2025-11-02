@@ -63,7 +63,7 @@ class BrowserRegistrationHandler:
                     '--disable-setuid-sandbox',
                     '--disable-web-security',
                     '--disable-features=IsolateOrigins,site-per-process',
-                    f'--window-size=800,1000',
+                    f'--window-size=800,1000',  # Normal size for debugging
                 ]
                 
                 self.browser = await p.chromium.launch(
@@ -73,7 +73,7 @@ class BrowserRegistrationHandler:
                 
                 # Create context with cookies and proxy (with comprehensive anti-bot headers)
                 context_options = {
-                    'viewport': {'width': 800, 'height': 1000},
+                    'viewport': {'width': 800, 'height': 1000},  # Normal viewport
                     'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'locale': 'es-ES',
                     'timezone_id': 'Europe/Madrid',
@@ -279,46 +279,46 @@ class BrowserRegistrationHandler:
                 
                 logger.info("✅ OTP sent successfully!")
                 
-                # Step 6: Wait for OTP from email
-                logger.info("📧 Step 6: Waiting for OTP from email...")
-                if not email_service:
-                    logger.error("❌ No email service provided")
-                    await self.browser.close()
-                    return False, {'error': 'No email service'}
-                
+                # Step 6: Get OTP code from user input
+                logger.info("📧 Step 6: Waiting for OTP code...")
                 email = user_data.get('Email')
                 
-                # Try to get OTP automatically first
-                logger.info(f"📧 Attempting to retrieve OTP automatically from: {email}")
-                logger.info(f"📧 Email service: {email_service_name or 'auto-detect'}")
-                otp_code = await email_service.wait_for_otp(email, service_name=email_service_name, timeout_seconds=60)
+                # Manual OTP entry - wait for user to input in console
+                logger.info("")
+                logger.info("="*80)
+                logger.info("📧 MANUAL OTP ENTRY REQUIRED")
+                logger.info("="*80)
+                logger.info(f"📧 Please check {email} and enter the OTP code in the console below:")
+                logger.info("="*80)
+                logger.info("")
+                
+                # Simple console input using threading (works with headless browsers)
+                import threading
+                otp_received = threading.Event()
+                user_otp = [None]
+                
+                def get_console_input():
+                    try:
+                        otp = input(f"📧 Please enter OTP code received at {email}: ").strip()
+                        user_otp[0] = otp
+                        otp_received.set()
+                    except:
+                        pass
+                
+                input_thread = threading.Thread(target=get_console_input)
+                input_thread.daemon = True
+                input_thread.start()
+                
+                # Wait for user input (with timeout) - this will block
+                otp_received.wait(timeout=300)  # 5 minutes timeout
+                otp_code = user_otp[0]
                 
                 if not otp_code:
-                    logger.warning("⚠️ Failed to retrieve OTP automatically")
-                    logger.warning("⚠️ BLS might not send emails to temporary email services")
-                    logger.info("💡 SOLUTION: Please check your email manually and look for the OTP")
-                    logger.info("💡 The OTP field (#EmailOtp) should be visible in the browser")
-                    logger.info("💡 You can manually enter the OTP in the browser and click Submit")
-                    logger.info("💡 Or use a REAL email service (Gmail/Outlook with IMAP)")
-                    
-                    # Keep browser open for manual OTP entry
-                    logger.info("⏳ Keeping browser open for 5 minutes for manual OTP entry...")
-                    logger.info("💡 After you enter OTP and click Submit, the process will complete")
-                    
-                    # Wait for submission to complete (check for success page)
-                    await asyncio.sleep(300)  # 5 minutes
-                    
-                    # Check if registration succeeded
-                    success = await self._check_registration_success()
-                    if success:
-                        logger.info("✅ Registration completed manually!")
-                        return True, {'status': 'success', 'message': 'Registration completed manually'}
-                    else:
-                        logger.error("❌ Manual registration timed out")
-                        await self.browser.close()
-                        return False, {'error': 'Manual OTP entry timeout'}
+                    logger.error("❌ No OTP code received - timeout or no input")
+                    await self.browser.close()
+                    return False, {'error': 'OTP timeout'}
                 
-                logger.info(f"✅ OTP retrieved automatically: {otp_code}")
+                logger.info(f"✅ OTP code received: {otp_code}")
                 
                 # Step 7: Fill OTP and submit
                 logger.info("📝 Step 7: Filling OTP and submitting...")
@@ -1108,33 +1108,43 @@ class BrowserRegistrationHandler:
                 return True
             else:
                 logger.warning("⚠️ Captcha submission failed or another captcha appeared")
-                # Switch back to iframe context
-                await self.page.wait_for_selector('iframe.k-content-frame', timeout=10000)
-                iframe_element = await self.page.query_selector('iframe.k-content-frame')
-                captcha_frame = await iframe_element.content_frame()
+                # Wait a bit for new captcha to load if submission failed
+                await asyncio.sleep(3)
                 
                 # Check if another captcha appeared
-                captcha_available = await captcha_frame.evaluate("""
-                    () => {
-                        const images = document.querySelectorAll('.captcha-img');
-                        return images.length >= 54;
-                    }
-                """)
-                
-                if captcha_available:
-                    # Check retry limit
-                    if retry_count < max_retries:
-                        logger.info(f"🔄 Another captcha detected, retrying automatic solving (attempt {retry_count + 1}/{max_retries})...")
-                        # Wait a bit before retry
-                        await asyncio.sleep(2)
-                        # Recursive call to solve again
-                        return await self._solve_captcha_automatically_with_retry(timeout, retry_count + 1, max_retries)
+                try:
+                    # Switch back to iframe context
+                    await self.page.wait_for_selector('iframe.k-content-frame', timeout=10000)
+                    iframe_element = await self.page.query_selector('iframe.k-content-frame')
+                    captcha_frame = await iframe_element.content_frame()
+                    
+                    # Check if another captcha appeared
+                    captcha_available = await captcha_frame.evaluate("""
+                        () => {
+                            const images = document.querySelectorAll('.captcha-img');
+                            return images.length >= 54;
+                        }
+                    """)
+                    
+                    if captcha_available:
+                        # Check retry limit
+                        if retry_count < max_retries:
+                            logger.info(f"🔄 Another captcha detected, retrying automatic solving (attempt {retry_count + 1}/{max_retries})...")
+                            # Wait a bit before retry
+                            await asyncio.sleep(2)
+                            # Recursive call to solve again
+                            return await self._solve_captcha_automatically_with_retry(timeout, retry_count + 1, max_retries)
+                        else:
+                            logger.error(f"❌ Max retries ({max_retries}) reached for captcha solving")
+                            logger.info("💡 Falling back to manual solving...")
+                            return await self._wait_for_captcha_solved_manual(timeout=30)
                     else:
-                        logger.error(f"❌ Max retries ({max_retries}) reached for captcha solving")
-                        logger.info("💡 Falling back to manual solving...")
+                        logger.warning("⚠️ No captcha available, falling back to manual solving")
                         return await self._wait_for_captcha_solved_manual(timeout=30)
-                else:
-                    logger.warning("⚠️ No captcha available, falling back to manual solving")
+                except Exception as iframe_error:
+                    # If we can't access iframe, might mean captcha closed or navigation happened
+                    logger.warning(f"⚠️ Could not check for new captcha: {iframe_error}")
+                    logger.info("💡 Falling back to manual solving...")
                     return await self._wait_for_captcha_solved_manual(timeout=30)
             
         except Exception as e:
