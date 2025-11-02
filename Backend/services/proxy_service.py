@@ -43,9 +43,10 @@ class ProxyService:
                     
                     if avoid_recent and len(proxies) > 1:
                         # Try to avoid recently used proxies
+                        # For session-based proxies, track by username (session ID) instead of host:port
                         available_proxies = [
                             p for p in proxies 
-                            if f"{p.host}:{p.port}" not in self.recently_used_proxies
+                            if f"{p.host}:{p.port}:{p.username}" not in self.recently_used_proxies
                         ]
                         
                         # If all proxies were recently used, use all proxies
@@ -57,14 +58,24 @@ class ProxyService:
                     # Select a random proxy from available ones
                     proxy = random.choice(available_proxies)
                     
-                    # Track this proxy as recently used
-                    proxy_key = f"{proxy.host}:{proxy.port}"
+                    # Track this proxy as recently used (include username for session-based proxies)
+                    proxy_key = f"{proxy.host}:{proxy.port}:{proxy.username}"
                     if proxy_key not in self.recently_used_proxies:
                         self.recently_used_proxies.append(proxy_key)
                         
                     # Keep only the last N proxies in the cache
                     if len(self.recently_used_proxies) > self.max_recent_cache:
                         self.recently_used_proxies.pop(0)
+                    
+                    # Extract session ID for logging (if session-based proxy)
+                    session_id = "N/A"
+                    if proxy.username and 'session-' in proxy.username:
+                        try:
+                            session_id = proxy.username.split('session-')[1].split('-')[0]
+                        except:
+                            session_id = "unknown"
+                    
+                    logger.info(f"🎲 Selected proxy: {proxy.host}:{proxy.port} (session: {session_id}, country: {country})")
                     
                     proxy_config = {
                         "host": proxy.host,

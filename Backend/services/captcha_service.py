@@ -100,6 +100,12 @@ class CaptchaService:
                 # Use NoCaptcha.io for other types
                 logger.info(f"📡 Submitting captcha to NoCaptcha.io: {captcha_data}")
                 
+                # Create SSL context that doesn't verify certificates
+                import ssl
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                
                 async with aiohttp.ClientSession() as session:
                     headers = {
                         "Content-Type": "application/json",
@@ -109,7 +115,8 @@ class CaptchaService:
                     async with session.post(
                         f"{self.api_url}/solve",
                         json=captcha_data,
-                        headers=headers
+                        headers=headers,
+                        ssl=ssl_context
                     ) as response:
                         response_text = await response.text()
                         logger.info(f"📡 NoCaptcha.io response: {response.status} - {response_text}")
@@ -153,6 +160,12 @@ class CaptchaService:
             
             logger.info(f"📡 Submitting BLS captcha to NoCaptchaAI: {len(images)} images")
             
+            # Create SSL context that doesn't verify certificates
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
             async with aiohttp.ClientSession() as session:
                 headers = {
                     "Content-Type": "application/json"
@@ -161,7 +174,8 @@ class CaptchaService:
                 async with session.post(
                     f"{self.api_url}/createTask",
                     json=payload,
-                    headers=headers
+                    headers=headers,
+                    ssl=ssl_context
                 ) as response:
                     response_text = await response.text()
                     logger.info(f"📡 NoCaptchaAI response: {response.status} - {response_text}")
@@ -193,6 +207,12 @@ class CaptchaService:
         try:
             logger.info(f"Waiting for NoCaptchaAI solution, task_id: {task_id}")
             
+            # Create SSL context that doesn't verify certificates
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
             async with aiohttp.ClientSession() as session:
                 headers = {
                     "Content-Type": "application/json"
@@ -209,7 +229,8 @@ class CaptchaService:
                     async with session.post(
                         f"{self.api_url}/getTaskResult",
                         json=payload,
-                        headers=headers
+                        headers=headers,
+                        ssl=ssl_context
                     ) as response:
                         if response.status == 200:
                             result = await response.json()
@@ -319,6 +340,12 @@ class CaptchaService:
             
             logger.info(f"📡 Submitting {len(base64_images)} images to NoCaptchaAI API")
             
+            # Create SSL context that doesn't verify certificates
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
             async with aiohttp.ClientSession() as session:
                 headers = {
                     "Content-Type": "application/json"
@@ -327,7 +354,8 @@ class CaptchaService:
                 async with session.post(
                     f"{self.api_url}/createTask",
                     json=payload,
-                    headers=headers
+                    headers=headers,
+                    ssl=ssl_context
                 ) as response:
                     response_text = await response.text()
                     logger.info(f"📡 NoCaptchaAI response: {response.status} - {response_text}")
@@ -376,6 +404,12 @@ class CaptchaService:
         try:
             logger.info(f"Waiting for captcha solution, task_id: {task_id}")
             
+            # Create SSL context that doesn't verify certificates
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
             async with aiohttp.ClientSession() as session:
                 headers = {
                     "Authorization": f"Bearer {self.api_key}"
@@ -386,7 +420,8 @@ class CaptchaService:
                 while (asyncio.get_event_loop().time() - start_time) < max_wait_time:
                     async with session.get(
                         f"{self.api_url}/result/{task_id}",
-                        headers=headers
+                        headers=headers,
+                        ssl=ssl_context
                     ) as response:
                         if response.status == 200:
                             result = await response.json()

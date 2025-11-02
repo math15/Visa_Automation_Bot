@@ -177,41 +177,29 @@ class ImageExtractor:
         for i, (container_id, image_src, onclick_id) in enumerate(visible_image_matches):
             logger.info(f"   Processing visible image {i+1}: container_id='{container_id}', onclick_id='{onclick_id}'")
             
-            # Check if IDs match
-            if container_id == onclick_id:
-                try:
-                    # Extract just the base64 part for validation
-                    if 'base64,' in image_src:
-                        base64_part = image_src.split('base64,')[1]
-                        decoded = base64.b64decode(base64_part)
-                        if len(decoded) > 50:  # Lower threshold for captcha images
-                            image_data_list.append((image_src, container_id))
-                            logger.info(f"✅ Found valid visible image with ID: {container_id}")
-                        else:
-                            logger.warning(f"⚠️ Visible image {container_id} has invalid base64 data (too small)")
+            # Always use onclick_id as the captcha ID (not container_id)
+            # The onclick ID is what BLS expects when submitting the solution
+            try:
+                # Extract just the base64 part for validation
+                if 'base64,' in image_src:
+                    base64_part = image_src.split('base64,')[1]
+                    decoded = base64.b64decode(base64_part)
+                    if len(decoded) > 50:  # Lower threshold for captcha images
+                        image_data_list.append((image_src, onclick_id))
+                        logger.info(f"✅ Found valid visible image with onclick ID: {onclick_id}")
                     else:
-                        logger.warning(f"⚠️ Visible image {container_id} has no base64 data")
-                except Exception as e:
-                    logger.warning(f"⚠️ Skipping invalid base64 data for visible image {container_id}: {e}")
-            else:
-                logger.warning(f"⚠️ Visible image {i+1} has mismatched IDs: container_id='{container_id}' != onclick_id='{onclick_id}'")
-                # Try to use the container_id anyway for the missing image
-                try:
-                    if 'base64,' in image_src:
-                        base64_part = image_src.split('base64,')[1]
-                        decoded = base64.b64decode(base64_part)
-                        if len(decoded) > 50:
-                            image_data_list.append((image_src, container_id))
-                            logger.info(f"✅ Found visible image with mismatched IDs, using container_id: {container_id}")
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not process mismatched ID visible image: {e}")
+                        logger.warning(f"⚠️ Visible image {onclick_id} has invalid base64 data (too small)")
+                else:
+                    logger.warning(f"⚠️ Visible image {onclick_id} has no base64 data")
+            except Exception as e:
+                logger.warning(f"⚠️ Skipping invalid base64 data for visible image {onclick_id}: {e}")
         
         # Extract images and IDs in order
         captcha_images = []
         image_ids = []
-        for image_src, container_id in image_data_list:
+        for image_src, onclick_id in image_data_list:
             captcha_images.append(image_src)
-            image_ids.append(container_id)
+            image_ids.append(onclick_id)
         
         logger.info(f"🎯 Total captcha images found: {len(captcha_images)}")
         logger.info(f"🎯 Total image IDs found: {len(image_ids)}")

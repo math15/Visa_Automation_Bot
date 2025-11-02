@@ -222,8 +222,11 @@ class OTPHandler:
             # Add visitorId_current if not present (REQUIRED by BLS!)
             # This should come from the registration page cookies, but fallback to default if missing
             if 'visitorId_current' not in cookies:
-                cookies['visitorId_current'] = '22615162'  # Fallback to default
-                logger.warning("⚠️ visitorId_current not found in cookies, using fallback: 22615162")
+                # Generate random visitor ID as fallback
+                import random
+                fallback_id = str(random.randint(10000000, 99999999))
+                cookies['visitorId_current'] = fallback_id
+                logger.warning(f"⚠️ visitorId_current not found in cookies, using random fallback: {fallback_id}")
             else:
                 logger.info(f"🆔 Using visitorId_current from cookies: {cookies['visitorId_current']}")
             

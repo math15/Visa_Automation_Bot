@@ -20,7 +20,10 @@ class BLSAccountCreator:
     
     def __init__(self, visitor_id: str = None):
         """Initialize the BLS account creator with modular components"""
-        self.visitor_id = visitor_id or "22615162"  # Default visitor ID
+        # Generate random visitor ID (8 digits) if not provided
+        # This ensures each account creation uses a different session ID
+        import random
+        self.visitor_id = visitor_id or str(random.randint(10000000, 99999999))
         self.base_url = "https://algeria.blsspainglobal.com"
         self.register_url = "/dza/account/RegisterUser"
         

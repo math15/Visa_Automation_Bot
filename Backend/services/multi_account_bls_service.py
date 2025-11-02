@@ -115,6 +115,12 @@ class MultiAccountBLSService:
         """Create BLS account for a single account"""
         async with semaphore:
             try:
+                # Add delay between requests to avoid rate limiting (5-10 seconds)
+                import random
+                delay = random.uniform(5, 10)
+                logger.info(f"⏱️  Waiting {delay:.1f}s before creating account (rate limiting prevention)...")
+                await asyncio.sleep(delay)
+                
                 logger.info(f"Creating BLS account for: {account.email}")
                 
                 # Convert Account to BLSAccountCreate

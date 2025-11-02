@@ -16,6 +16,14 @@ import os
 import asyncio
 from loguru import logger
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    logger.info("✅ Loaded environment variables from .env file")
+except ImportError:
+    logger.warning("⚠️ python-dotenv not installed, skipping .env loading")
+
 # Optional imports for enhanced features
 try:
     import aiohttp
@@ -905,10 +913,11 @@ def add_proxy(
     try:
         logger.info(f"Adding proxy: {proxy_data.host}:{proxy_data.port} ({proxy_data.country})")
         
-        # Check if proxy already exists
+        # Check if proxy already exists (check host, port, and username for session-based proxies)
         existing = db.query(Proxy).filter(
             Proxy.host == proxy_data.host,
-            Proxy.port == proxy_data.port
+            Proxy.port == proxy_data.port,
+            Proxy.username == proxy_data.username
         ).first()
         
         if existing:
@@ -963,6 +972,72 @@ def get_proxies(db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"Error getting proxies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# BLS Login endpoint
+class BLSLoginRequest(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/enhanced-bls/login")
+async def bls_login(login_data: BLSLoginRequest, db: Session = Depends(get_db)):
+    """Login to BLS account with automatic captcha solving"""
+    try:
+        logger.info(f"🔐 Starting BLS login for: {login_data.email}")
+        
+        # Get proxy for login
+        from services.proxy_service import ProxyService
+        proxy_service = ProxyService(db)
+        proxy = proxy_service.get_random_proxy()
+        
+        proxy_url = None
+        if proxy:
+            if proxy.username:
+                proxy_url = f"http://{proxy.username}:{proxy.password}@{proxy.host}:{proxy.port}"
+            else:
+                proxy_url = f"http://{proxy.host}:{proxy.port}"
+            logger.info(f"🌐 Using proxy: {proxy.host}:{proxy.port}")
+        else:
+            logger.warning("⚠️ No proxy available")
+        
+        # Perform login with browser automation
+        # Browser will automatically handle AWS WAF and generate cookies
+        import random
+        cookies = {
+            'visitorId_current': str(random.randint(10000000, 99999999))
+        }
+        
+        # Perform login with browser automation
+        from services.bls_modules.browser_login_handler import BrowserLoginHandler
+        login_handler = BrowserLoginHandler()
+        
+        login_result = await login_handler.login_in_browser(
+            login_url="https://algeria.blsspainglobal.com/dza/account/Login",
+            email=login_data.email,
+            password=login_data.password,
+            cookies=cookies,
+            proxy_url=proxy_url,
+            headless=False  # Show browser for debugging
+        )
+        
+        if login_result[0]:
+            logger.info("✅ Login successful!")
+            return {
+                "success": True,
+                "message": "Login successful",
+                "cookies": login_result[1].get('cookies', {}),
+                "email": login_data.email
+            }
+        else:
+            logger.error(f"❌ Login failed: {login_result[1].get('error')}")
+            return {
+                "success": False,
+                "error": login_result[1].get('error'),
+                "email": login_data.email
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ Error in BLS login: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Root endpoint

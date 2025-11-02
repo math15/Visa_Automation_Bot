@@ -600,9 +600,17 @@ class BrowserRegistrationHandler:
             raise
     
     async def _solve_captcha_automatically(self, timeout: int = 300) -> bool:
-        """Automatically solve captcha using NoCaptchaAI"""
+        """Automatically solve captcha using NoCaptchaAI with retry logic"""
+        # Wrapper to add retry logic
+        return await self._solve_captcha_automatically_with_retry(timeout, retry_count=0, max_retries=3)
+    
+    async def _solve_captcha_automatically_with_retry(self, timeout: int = 300, retry_count: int = 0, max_retries: int = 3) -> bool:
+        """Automatically solve captcha using NoCaptchaAI with retry on failure"""
         try:
-            logger.info("🤖 Starting automatic captcha solving with NoCaptchaAI...")
+            if retry_count > 0:
+                logger.info(f"🔄 Retry attempt {retry_count}/{max_retries} - Solving captcha again...")
+            else:
+                logger.info("🤖 Starting automatic captcha solving with NoCaptchaAI...")
             
             # Step 1: Find and switch to the captcha iframe
             logger.info("🔍 Looking for captcha iframe...")
@@ -624,55 +632,124 @@ class BrowserRegistrationHandler:
             logger.info("✅ Switched to captcha iframe context")
             
             # Step 1.5: Wait for iframe content to fully load
-            logger.info("⏳ Waiting for captcha iframe content to load...")
+            logger.info("⏳ Waiting for captcha iframe content to load (54 images + CSS)...")
             
-            # Wait for at least one visible image with a reasonable timeout
-            max_wait = 15  # Maximum 15 seconds to wait
+            # Wait for all 54 images to load and 9 to be visible
+            max_wait = 30  # Maximum 30 seconds to wait (54 images need time to load)
             start_time = asyncio.get_event_loop().time()
             
             while True:
                 try:
                     elapsed = asyncio.get_event_loop().time() - start_time
                     
-                    # Check if we have visible images with base64 data
+                    # Comprehensive check for full iframe load (images + CSS + JS + positioning)
                     check_result = await captcha_frame.evaluate("""
                         () => {
-                            const images = document.querySelectorAll('.captcha-img');
-                            if (images.length === 0) return { ready: false, visible: 0, total: 0 };
+                            // 1. Check document ready state
+                            if (document.readyState !== 'complete') {
+                                return { ready: false, reason: 'document not ready', visible: 0, total: 0 };
+                            }
                             
-                            // Count ONLY the first 9 visible images with base64 (the 3x3 grid)
+                            // 2. Check if images exist
+                            const images = document.querySelectorAll('.captcha-img');
+                            const totalCount = images.length;
+                            
+                            if (totalCount === 0) {
+                                return { ready: false, reason: 'no images found', visible: 0, total: 0 };
+                            }
+                            
+                            if (totalCount < 54) {
+                                return { ready: false, reason: `only ${totalCount} images`, visible: 0, total: totalCount };
+                            }
+                            
+                            // 3. Check if all images have base64 data and onclick handlers
+                            let imagesWithData = 0;
+                            let imagesWithOnclick = 0;
                             let visibleCount = 0;
-                            let totalCount = images.length;
                             
                             for (let img of images) {
-                                // Stop counting after 9 visible images
-                                if (visibleCount >= 9) break;
+                                // Check base64 src
+                                if (img.src && img.src.includes('base64')) {
+                                    imagesWithData++;
+                                }
                                 
-                                const style = window.getComputedStyle(img);
+                                // Check onclick attribute
+                                if (img.getAttribute('onclick')) {
+                                    imagesWithOnclick++;
+                                }
+                                
+                                // Count visible images for logging
+                                const imgStyle = window.getComputedStyle(img);
                                 const parentStyle = window.getComputedStyle(img.parentElement);
+                                const isVisible = imgStyle.display !== 'none' && 
+                                                parentStyle.display !== 'none' &&
+                                                img.offsetWidth > 0 && 
+                                                img.offsetHeight > 0;
+                                if (isVisible) visibleCount++;
+                            }
+                            
+                            if (imagesWithData < 54) {
+                                return { ready: false, reason: `${imagesWithData}/54 with data`, visible: imagesWithData, total: totalCount };
+                            }
+                            
+                            if (imagesWithOnclick < 54) {
+                                return { ready: false, reason: `${imagesWithOnclick}/54 with onclick`, visible: imagesWithOnclick, total: totalCount };
+                            }
+                            
+                            // 4. Check if .col-4 divs have CSS positioning (left, top, z-index)
+                            const divs = document.querySelectorAll('.col-4');
+                            let divsWithPositioning = 0;
+                            
+                            for (let div of divs) {
+                                const style = window.getComputedStyle(div);
+                                const left = style.getPropertyValue('left');
+                                const top = style.getPropertyValue('top');
+                                const zIndex = style.getPropertyValue('z-index');
                                 
-                                if (style.display !== 'none' && 
-                                    parentStyle.display !== 'none' &&
-                                    img.offsetWidth > 0 && 
-                                    img.offsetHeight > 0 &&
-                                    img.src && 
-                                    img.src.includes('base64')) {
-                                    visibleCount++;
+                                if (left !== 'auto' && top !== 'auto' && zIndex !== 'auto') {
+                                    divsWithPositioning++;
                                 }
                             }
                             
+                            if (divsWithPositioning < 54) {
+                                return { ready: false, reason: `${divsWithPositioning}/54 positioned`, visible: visibleCount, total: totalCount };
+                            }
+                            
+                            // 5. Check if submit button and question exist
+                            const submitBtn = document.querySelector('#submit');
+                            if (!submitBtn) {
+                                return { ready: false, reason: 'no submit button', visible: visibleCount, total: totalCount };
+                            }
+                            
+                            const question = document.querySelector('.box-label');
+                            if (!question || !question.innerText.trim()) {
+                                return { ready: false, reason: 'no question text', visible: visibleCount, total: totalCount };
+                            }
+                            
+                            // Everything is ready!
                             return {
-                                ready: visibleCount >= 9,
+                                ready: true,
+                                reason: 'fully loaded',
                                 visible: visibleCount,
                                 total: totalCount
                             };
                         }
                     """)
                     
-                    logger.info(f"📊 Captcha status: {check_result['visible']}/{check_result['total']} images visible ({elapsed:.1f}s)")
+                    # Show reason if not ready
+                    if check_result.get('ready'):
+                        logger.info(f"📊 Captcha status: {check_result.get('reason', 'ready')} - {check_result['visible']}/{check_result['total']} images ({elapsed:.1f}s)")
+                    else:
+                        logger.info(f"📊 Captcha status: {check_result.get('reason', 'loading...')} ({elapsed:.1f}s)")
                     
                     if check_result['ready']:
-                        logger.info(f"✅ Captcha fully loaded! {check_result['visible']} visible images found")
+                        logger.info(f"✅ Captcha fully loaded! {check_result['total']} total images found")
+                        logger.info(f"ℹ️ All images have base64 data, onclick handlers, and CSS positioning applied")
+                        logger.info(f"ℹ️ Note: {check_result['visible']} appear visible by CSS, but we'll extract exactly 9 by position+z-index")
+                        # Wait additional time to ensure all animations and final rendering is complete
+                        logger.info("⏳ Waiting 5 seconds to ensure iframe is fully settled...")
+                        await asyncio.sleep(5)
+                        logger.info("✅ Captcha iframe should now be fully ready for extraction!")
                         break
                     
                     if elapsed >= max_wait:
@@ -695,80 +772,116 @@ class BrowserRegistrationHandler:
                     await asyncio.sleep(1)
             
             # Step 2: Get captcha images and question from the iframe
-            logger.info("📸 Extracting captcha images and question...")
+            logger.info("📸 Extracting captcha images using position + z-index method (like solver.js)...")
             captcha_data = await captcha_frame.evaluate("""
                 () => {
-                    // Get captcha question from div with class 'box-label'
-                    const questionElement = document.querySelector('.box-label');
-                    const question = questionElement ? questionElement.innerText.trim() : '';
+                    // Get captcha question using z-index (like solver.js)
+                    // There are multiple .box-label elements, we need the one with highest z-index
+                    function getQuestionByZIndex() {
+                        const labels = [...document.querySelectorAll('.box-label')];
+                        let maxZIndex = 0;
+                        let foundLabel = null;
+                        
+                        console.log(`Found ${labels.length} .box-label elements, finding one with highest z-index...`);
+                        
+                        for (let label of labels) {
+                            const style = window.getComputedStyle(label);
+                            const zIndex = style.getPropertyValue('z-index');
+                            const zIndexNum = parseInt(zIndex);
+                            
+                            if (zIndex !== 'auto' && zIndexNum > maxZIndex) {
+                                maxZIndex = zIndexNum;
+                                foundLabel = label;
+                            }
+                        }
+                        
+                        if (foundLabel) {
+                            console.log(`✅ Selected question label with z-index ${maxZIndex}: "${foundLabel.innerText.trim()}"`);
+                            return { text: foundLabel.innerText.trim(), zIndex: maxZIndex };
+                        }
+                        
+                        return { text: '', zIndex: 0 };
+                    }
                     
-                    // Get VISIBLE captcha images using same logic as image_extractor.py
-                    // Check ALL images and filter by CSS visibility (not just first 9)
+                    const questionData = getQuestionByZIndex();
+                    const question = questionData.text;
+                    const questionZIndex = questionData.zIndex;
+                    
+                    // BLS uses POSITION + Z-INDEX to show 9 images in 3x3 grid
+                    // All 54 images are stacked, but only highest z-index at each position is visible
+                    
+                    // Function to find the visible div at a specific position (highest z-index)
+                    function findVisibleDivAtPosition(left, top) {
+                        const allDivs = [...document.querySelectorAll('.col-4')].filter(d => d.getClientRects().length);
+                        let maxZIndex = 0;
+                        let foundDiv = null;
+                        
+                        for (let div of allDivs) {
+                            const style = window.getComputedStyle(div);
+                            const divLeft = style.getPropertyValue('left');
+                            const divTop = style.getPropertyValue('top');
+                            const divZIndex = style.getPropertyValue('z-index');
+                            
+                            // Check if this div is at our target position
+                            if (divLeft === left + 'px' && divTop === top + 'px' && divZIndex !== 'auto') {
+                                const zIndexNum = parseInt(divZIndex);
+                                if (zIndexNum > maxZIndex) {
+                                    maxZIndex = zIndexNum;
+                                    foundDiv = div;
+                                }
+                            }
+                        }
+                        
+                        return foundDiv;
+                    }
+                    
+                    // The 9 grid positions for 3x3 captcha (left, top in pixels)
+                    const gridPositions = [
+                        [0, 0],     [110, 0],     [220, 0],      // Top row
+                        [0, 110],   [110, 110],   [220, 110],    // Middle row
+                        [0, 220],   [110, 220],   [220, 220]     // Bottom row
+                    ];
+                    
                     const images = [];
-                    const imageElements = document.querySelectorAll('.captcha-img');
+                    const totalImages = document.querySelectorAll('.captcha-img').length;
                     
-                    console.log(`Found ${imageElements.length} total captcha images`);
+                    console.log(`Found ${totalImages} total images, extracting 9 visible from grid positions...`);
                     
-                    imageElements.forEach((img, index) => {
-                        // Get the parent div (image container)
-                        const parentDiv = img.parentElement;
+                    gridPositions.forEach(([left, top], gridIndex) => {
+                        const visibleDiv = findVisibleDivAtPosition(left, top);
                         
-                        // Check if image or parent is hidden by CSS
-                        const imgStyle = window.getComputedStyle(img);
-                        const parentStyle = window.getComputedStyle(parentDiv);
-                        
-                        // Check for CSS hiding (display:none, visibility:hidden, opacity:0)
-                        const isHiddenByDisplay = (
-                            imgStyle.display === 'none' || 
-                            parentStyle.display === 'none'
-                        );
-                        
-                        const isHiddenByVisibility = (
-                            imgStyle.visibility === 'hidden' || 
-                            parentStyle.visibility === 'hidden'
-                        );
-                        
-                        const isHiddenByOpacity = (
-                            parseFloat(imgStyle.opacity) === 0 || 
-                            parseFloat(parentStyle.opacity) === 0
-                        );
-                        
-                        // Check if element has size (offsetWidth/offsetHeight)
-                        const hasSize = (
-                            img.offsetWidth > 0 && 
-                            img.offsetHeight > 0
-                        );
-                        
-                        // Image is visible if NOT hidden and has size
-                        const isVisible = !isHiddenByDisplay && !isHiddenByVisibility && !isHiddenByOpacity && hasSize;
-                        
-                        if (isVisible) {
-                            images.push({
-                                index: images.length,  // Sequential index for visible images only
-                                originalIndex: index,   // Keep track of original DOM position
-                                src: img.src,
-                                id: img.id || `captcha-img-${index}`,
-                                onclick: img.getAttribute('onclick') || '',
-                                parentId: parentDiv.id || ''
-                            });
-                            console.log(`✅ Visible image ${images.length}: index=${index}, id=${img.id || parentDiv.id}`);
+                        if (visibleDiv) {
+                            const img = visibleDiv.querySelector('.captcha-img');
+                            if (img) {
+                                // Extract onclick ID from onclick="Select('ID',this)"
+                                const onclickAttr = img.getAttribute('onclick') || '';
+                                const match = onclickAttr.match(/Select\\('([^']+)'/);
+                                const captchaId = match ? match[1] : (img.id || `unknown-${gridIndex}`);
+                                
+                                images.push({
+                                    index: gridIndex,           // Grid position (0-8)
+                                    src: img.src,
+                                    id: captchaId,              // The REAL captcha ID from onclick
+                                    onclick: onclickAttr,
+                                    position: `(${left},${top})`,
+                                    zIndex: window.getComputedStyle(visibleDiv).getPropertyValue('z-index')
+                                });
+                                
+                                console.log(`✅ Grid ${gridIndex} at (${left},${top}): ID=${captchaId}, z-index=${window.getComputedStyle(visibleDiv).getPropertyValue('z-index')}`);
+                            }
                         } else {
-                            const reasons = [];
-                            if (isHiddenByDisplay) reasons.push('display:none');
-                            if (isHiddenByVisibility) reasons.push('visibility:hidden');
-                            if (isHiddenByOpacity) reasons.push('opacity:0');
-                            if (!hasSize) reasons.push('no size');
-                            console.log(`❌ Hidden image: index=${index}, reasons=[${reasons.join(', ')}]`);
+                            console.log(`❌ No visible div found at position (${left},${top})`);
                         }
                     });
                     
-                    console.log(`Found ${images.length} visible images out of ${imageElements.length} total`);
+                    console.log(`Extracted ${images.length} visible images from 3x3 grid`);
                     
                     return {
                         question: question,
+                        questionZIndex: questionZIndex,
                         images: images,
                         count: images.length,
-                        totalImages: imageElements.length
+                        totalImages: totalImages
                     };
                 }
             """)
@@ -778,14 +891,40 @@ class BrowserRegistrationHandler:
                 logger.info(f"ℹ️ Total images in HTML: {captcha_data.get('totalImages', 0)}")
                 return await self._wait_for_captcha_solved_manual(timeout)
             
-            logger.info(f"✅ Found {captcha_data['count']} VISIBLE captcha images (out of {captcha_data.get('totalImages', 'unknown')} total)")
-            logger.info(f"📝 Question: {captcha_data['question']}")
+            total_images = captcha_data.get('totalImages', 'unknown')
+            logger.info(f"✅ Found {captcha_data['count']} VISIBLE captcha images (out of {total_images} total)")
+            question_zindex = captcha_data.get('questionZIndex', 'unknown')
+            logger.info(f"📝 Question (z-index: {question_zindex}): {captcha_data['question']}")
+            
+            # BLS generates 54 total images, showing only 9 visible (3x3 grid)
+            if total_images != 'unknown' and total_images != 54:
+                logger.warning(f"⚠️ Expected 54 total images, but found {total_images}")
+            
+            # Log the pattern of visible images for debugging
+            if captcha_data['images']:
+                visible_ids = [img.get('id') for img in captcha_data['images']]
+                logger.info(f"📋 Extracted captcha IDs (from onclick): {visible_ids}")
+                
+                # Also log positions and z-indexes for verification
+                positions_info = [(img.get('position'), img.get('zIndex')) for img in captcha_data['images']]
+                logger.info(f"📋 Grid positions & z-indexes: {positions_info}")
+            
+            # BLS shows 9 visible images (3x3 grid) from 54 total. Warn if count is unexpected
+            if len(captcha_data['images']) != 9:
+                logger.warning(f"⚠️ Expected 9 visible images (3x3 grid from 54 total), but found {len(captcha_data['images'])}")
+                if len(captcha_data['images']) > 9:
+                    logger.warning(f"⚠️ Visibility detection may have failed - using first 9 images as safety measure")
+                    captcha_data['images'] = captcha_data['images'][:9]
+                    captcha_data['count'] = 9
+                else:
+                    logger.error(f"❌ Insufficient visible images for captcha (need 9 from 54 total, got {len(captcha_data['images'])})")
             
             # Step 3: Extract base64 image data (images already have base64 in src)
             from services.captcha_service import CaptchaService
             captcha_service = CaptchaService()
             
             image_base64_list = []
+            image_ids = []  # Store captcha IDs for clicking
             for img in captcha_data['images']:
                 try:
                     # Images have src like "data:image/gif;base64,..."
@@ -794,17 +933,19 @@ class BrowserRegistrationHandler:
                         # Extract base64 part after the comma
                         base64_data = src.split('base64,')[1]
                         image_base64_list.append(base64_data)
-                        logger.debug(f"✅ Extracted base64 for image {img['index']} ({len(base64_data)} chars)")
+                        image_ids.append(img['id'])  # Store the captcha ID
+                        logger.debug(f"✅ Extracted base64 for image grid {img['index']} (ID: {img['id']}, {len(base64_data)} chars)")
                     else:
-                        logger.warning(f"Image {img['index']} does not have base64 src")
+                        logger.warning(f"Image grid {img['index']} does not have base64 src")
                 except Exception as e:
-                    logger.warning(f"Failed to extract base64 from image {img['index']}: {e}")
+                    logger.warning(f"Failed to extract base64 from image grid {img['index']}: {e}")
             
             if not image_base64_list:
                 logger.error("❌ Failed to extract image data")
                 return await self._wait_for_captcha_solved_manual(timeout)
             
             logger.info(f"🔍 Solving captcha with {len(image_base64_list)} images...")
+            logger.info(f"📋 Image IDs to be used for clicking: {image_ids}")
             solution = await captcha_service.solve_bls_images(image_base64_list)
             
             if not solution:
@@ -840,63 +981,114 @@ class BrowserRegistrationHandler:
                 logger.error(f"❌ Unexpected solution format: {type(solution)}")
                 return await self._wait_for_captcha_solved_manual(timeout)
             
+            # Log all extracted texts with their grid positions and IDs
+            logger.info(f"📋 All extracted image texts:")
+            for idx, text in enumerate(image_texts):
+                captcha_id = image_ids[idx] if idx < len(image_ids) else 'unknown'
+                logger.info(f"   Grid {idx} (ID: {captcha_id}): '{text}'")
+            
             # Find indices of images that match the target number
             correct_indices = []
             for idx, text in enumerate(image_texts):
                 if text.strip() == target_number:
                     correct_indices.append(idx)
-                    logger.info(f"✅ Image {idx} matches target: {text}")
+                    captcha_id = image_ids[idx] if idx < len(image_ids) else 'unknown'
+                    logger.info(f"✅ Grid position {idx} (ID: {captcha_id}) matches target: {text}")
             
             if not correct_indices:
                 logger.warning(f"⚠️ No matching images found for target {target_number}")
-                logger.info(f"Image texts: {image_texts}")
+                logger.info(f"📊 Summary: Target='{target_number}', Extracted={image_texts}")
+                logger.info(f"💡 This might be an OCR accuracy issue with NoCaptchaAI")
+                logger.info(f"💡 Falling back to manual solving...")
                 return await self._wait_for_captcha_solved_manual(timeout)
             
-            logger.info(f"✅ Found {len(correct_indices)} matching images: {correct_indices}")
+            logger.info(f"✅ Found {len(correct_indices)} matching images at grid positions: {correct_indices}")
+            logger.info(f"📊 Will click {len(correct_indices)} out of 9 total images (only the ones matching '{target_number}')")
             
-            logger.info(f"🖱️ Clicking {len(correct_indices)} matching images...")
+            logger.info(f"🖱️ Clicking {len(correct_indices)} matching images using their captcha IDs...")
             
-            # Map correct_indices to originalIndex values for clicking
-            images_to_click = []
+            # Map correct_indices to captcha IDs for clicking
+            captcha_ids_to_click = []
             for idx in correct_indices:
-                if idx < len(captcha_data['images']):
-                    original_idx = captcha_data['images'][idx].get('originalIndex', idx)
-                    images_to_click.append(original_idx)
-                    logger.info(f"   Image {idx} (original position {original_idx}) matches target")
+                if idx < len(image_ids):
+                    captcha_id = image_ids[idx]
+                    captcha_ids_to_click.append(captcha_id)
+                    logger.info(f"   Grid {idx} (text='{image_texts[idx]}') → Captcha ID: {captcha_id}")
             
-            for original_idx in images_to_click:
+            for captcha_id in captcha_ids_to_click:
                 try:
-                    # Click the image by its ORIGINAL index in the DOM
-                    await captcha_frame.evaluate(f"""
+                    # Click the image using proper mouse events (mouseover, mousedown, mouseup, click)
+                    # This is how solver.js does it - BLS requires full mouse event simulation
+                    clicked = await captcha_frame.evaluate(f"""
                         () => {{
                             const images = document.querySelectorAll('.captcha-img');
-                            if (images[{original_idx}]) {{
-                                images[{original_idx}].click();
-                                console.log('Clicked image at original position {original_idx}');
+                            for (let img of images) {{
+                                const onclick = img.getAttribute('onclick') || '';
+                                if (onclick.includes('{captcha_id}')) {{
+                                    console.log('Found image with ID {captcha_id}, dispatching mouse events...');
+                                    // Simulate full mouse event sequence like solver.js
+                                    const events = ['mouseover', 'mousedown', 'mouseup', 'click'];
+                                    events.forEach(eventType => {{
+                                        const event = new MouseEvent(eventType, {{
+                                            bubbles: true,
+                                            cancelable: true,
+                                            view: window
+                                        }});
+                                        img.dispatchEvent(event);
+                                    }});
+                                    console.log('✅ Dispatched mouse events to image with captcha ID: {captcha_id}');
+                                    return true;
+                                }}
                             }}
+                            console.log('❌ Could not find image with captcha ID: {captcha_id}');
+                            return false;
                         }}
                     """)
                     await asyncio.sleep(0.5)  # Small delay between clicks
-                    logger.info(f"✅ Clicked image at position {original_idx}")
+                    if clicked:
+                        logger.info(f"✅ Clicked image with captcha ID: {captcha_id}")
+                    else:
+                        logger.warning(f"⚠️ Could not find image with captcha ID: {captcha_id}")
                 except Exception as e:
-                    logger.warning(f"Failed to click image at position {original_idx}: {e}")
+                    logger.warning(f"❌ Failed to click image with captcha ID {captcha_id}: {e}")
             
-            # Step 5: Click submit button within the iframe
+            # Wait a bit before clicking submit to ensure all selections are registered
+            logger.info(f"⏳ Waiting 1 second before clicking submit...")
+            await asyncio.sleep(1)
+            
+            # Step 5: Click submit button within the iframe (with proper mouse events like solver.js)
             logger.info("🖱️ Clicking captcha submit button...")
             submit_clicked = await captcha_frame.evaluate("""
                 () => {
-                    // Find submit button - based on HTML, it should be #submit
-                    const submitBtn = document.querySelector('#submit');
-                    if (submitBtn) {
-                        // The onclick calls onSubmit() function
-                        if (typeof onSubmit === 'function') {
-                            onSubmit();
-                            return true;
-                        } else {
-                            submitBtn.click();
-                            return true;
-                        }
+                    // Try multiple selectors for submit button (from solver.js and user feedback)
+                    let submitButton = document.querySelector('#submit');  // id="submit"
+                    
+                    if (!submitButton) {
+                        // Fallback to solver.js selector
+                        submitButton = document.querySelector('#captchaForm .img-actions > div:nth-child(3)');
                     }
+                    
+                    if (!submitButton) {
+                        // Another fallback
+                        submitButton = document.querySelector('.img-action.img-active[title="Submit Selection"]');
+                    }
+                    
+                    if (submitButton) {
+                        console.log('Found submit button, simulating mouse events...');
+                        // Simulate full mouse event sequence like solver.js
+                        const events = ['mouseover', 'mousedown', 'mouseup', 'click'];
+                        events.forEach(eventType => {
+                            const event = new MouseEvent(eventType, {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window
+                            });
+                            submitButton.dispatchEvent(event);
+                        });
+                        console.log('Clicked submit button');
+                        return true;
+                    }
+                    console.log('Submit button not found');
                     return false;
                 }
             """)
@@ -908,12 +1100,105 @@ class BrowserRegistrationHandler:
             
             await asyncio.sleep(2)  # Wait for submission
             
-            # Step 6: Verify if captcha was solved (check on main page, not iframe)
-            return await self._wait_for_captcha_solved_manual(timeout=30)
+            # Step 6: Verify if captcha was solved and retry if needed
+            captcha_solved = await self._verify_captcha_solved(max_wait=15)
+            
+            if captcha_solved:
+                logger.info("✅ Captcha solved successfully on first try!")
+                return True
+            else:
+                logger.warning("⚠️ Captcha submission failed or another captcha appeared")
+                # Switch back to iframe context
+                await self.page.wait_for_selector('iframe.k-content-frame', timeout=10000)
+                iframe_element = await self.page.query_selector('iframe.k-content-frame')
+                captcha_frame = await iframe_element.content_frame()
+                
+                # Check if another captcha appeared
+                captcha_available = await captcha_frame.evaluate("""
+                    () => {
+                        const images = document.querySelectorAll('.captcha-img');
+                        return images.length >= 54;
+                    }
+                """)
+                
+                if captcha_available:
+                    # Check retry limit
+                    if retry_count < max_retries:
+                        logger.info(f"🔄 Another captcha detected, retrying automatic solving (attempt {retry_count + 1}/{max_retries})...")
+                        # Wait a bit before retry
+                        await asyncio.sleep(2)
+                        # Recursive call to solve again
+                        return await self._solve_captcha_automatically_with_retry(timeout, retry_count + 1, max_retries)
+                    else:
+                        logger.error(f"❌ Max retries ({max_retries}) reached for captcha solving")
+                        logger.info("💡 Falling back to manual solving...")
+                        return await self._wait_for_captcha_solved_manual(timeout=30)
+                else:
+                    logger.warning("⚠️ No captcha available, falling back to manual solving")
+                    return await self._wait_for_captcha_solved_manual(timeout=30)
             
         except Exception as e:
             logger.error(f"❌ Error in automatic captcha solving: {e}")
             return await self._wait_for_captcha_solved_manual(timeout)
+    
+    async def _verify_captcha_solved(self, max_wait: int = 15) -> bool:
+        """Verify if captcha was successfully solved after submission"""
+        try:
+            waited = 0
+            check_interval = 0.5  # Check every 0.5 seconds for quick feedback
+            
+            logger.info(f"🔍 Verifying captcha was solved (max {max_wait}s)...")
+            
+            while waited < max_wait:
+                try:
+                    # Check if captcha was solved by looking for:
+                    # 1. CaptchaData field populated
+                    # 2. Generate OTP button (#btnGenerate) becomes visible
+                    captcha_solved = await self.page.evaluate("""
+                        () => {
+                            // Check if CaptchaData field has a value (populated after solving)
+                            const captchaData = document.querySelector('#CaptchaData');
+                            const hasCaptchaData = captchaData && captchaData.value && captchaData.value.length > 10;
+                            
+                            // Check if Generate OTP button is visible (this is the KEY indicator!)
+                            const generateBtn = document.querySelector('#btnGenerate');
+                            const isGenerateBtnVisible = generateBtn && generateBtn.style.display !== 'none' && 
+                                                        window.getComputedStyle(generateBtn).display !== 'none';
+                            
+                            // Check if Verified button is shown (Verify button hidden)
+                            const verifiedBtn = document.querySelector('#btnVerified');
+                            const isVerifiedBtnVisible = verifiedBtn && verifiedBtn.style.display !== 'none';
+                            
+                            if (hasCaptchaData) {
+                                console.log('✅ CaptchaData field is populated:', captchaData.value.substring(0, 50) + '...');
+                            }
+                            if (isGenerateBtnVisible) {
+                                console.log('✅ Generate OTP button is now visible!');
+                            }
+                            
+                            return hasCaptchaData && isGenerateBtnVisible;
+                        }
+                    """)
+                    
+                    if captcha_solved:
+                        logger.info("✅ Captcha solved! Generate OTP button is now visible!")
+                        # Wait a moment to ensure all data is set
+                        await asyncio.sleep(1)
+                        return True
+                    
+                except Exception as e:
+                    logger.debug(f"Check failed: {e}")
+                
+                await asyncio.sleep(check_interval)
+                waited += check_interval
+            
+            # Timeout - captcha not solved
+            logger.warning(f"⏱️ Verification timeout after {max_wait}s")
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Error verifying captcha: {e}")
+            return False
     
     async def _wait_for_captcha_solved_manual(self, timeout: int = 300) -> bool:
         """Wait for user to manually solve captcha (in popup window) - fallback method"""

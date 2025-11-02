@@ -398,10 +398,71 @@ export default function CreateAccountPage() {
 
 
 
-  const generateSampleData = () => {
+  const generateSampleData = async () => {
     // Generate complete sample data with all required fields
     const timestamp = Date.now();
-    const sampleEmail = `ahmed.benali${timestamp}@example.com`;
+    let sampleEmail = `ahmed.benali${timestamp}@example.com`;  // Fallback
+    let inboxUrl = '';
+    
+    // Try to generate REAL temporary email from backend
+    try {
+      const response = await fetch('http://localhost:8000/api/enhanced-bls/email/generate-real-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.email) {
+          sampleEmail = data.email;
+          console.log(`✅ Generated REAL temporary email: ${sampleEmail}`);
+          console.log(`📧 Service: ${data.service_name}`);
+          
+          // Use inbox URL from backend response
+          inboxUrl = data.inbox_url || '';
+          
+          // Create service-specific message
+          let serviceMessage = '';
+          if (data.service_name === 'mailtm') {
+            serviceMessage = '🎉 Mail.tm (FREE) - Automatic OTP retrieval enabled!';
+          } else if (data.service_name === 'tempmail_io') {
+            serviceMessage = '💎 Temp-Mail.io (Premium) - Automatic OTP retrieval enabled!';
+          } else {
+            serviceMessage = '📧 Temporary email generated - Check inbox for OTP';
+          }
+          
+          // Show success toast
+          addToast({
+            type: 'success',
+            title: '✅ Real Temporary Email Generated!',
+            description: `${serviceMessage}\n📧 ${sampleEmail}${inboxUrl ? '\n🌐 Inbox: ' + inboxUrl : ''}`
+          });
+          
+          console.log(`🌐 Inbox URL: ${inboxUrl || 'N/A (automatic retrieval)'}`);
+          console.log(`💡 Service: ${data.service_name}`);
+        }
+      } else {
+        console.warn('⚠️ Failed to generate real email from backend, using fallback');
+        addToast({
+          type: 'warning',
+          title: '⚠️ Fallback Email Used',
+          description: 'Using @example.com. Backend email service unavailable.'
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error generating real email:', error);
+      console.log('⚠️ Using fallback email (@example.com)');
+      addToast({
+        type: 'warning',
+        title: '⚠️ Fallback Email Used',
+        description: 'Backend not responding. Manual OTP entry will be required.'
+      });
+    }
+    
+    // Generate random 9-digit passport number (as required by BLS)
+    const randomPassportNumber = Math.floor(100000000 + Math.random() * 900000000).toString();
     
     const sampleData: FormData = {
       SurName: 'Benali',  // BLS: SurName (Family Name)
@@ -410,13 +471,13 @@ export default function CreateAccountPage() {
       FamilyName: 'Benali',  // Legacy
       DateOfBirth: '1990-05-15',
       Gender: 'Male',
-      PassportNumber: '123456789',
+      PassportNumber: randomPassportNumber,  // Random 9-digit number
       PassportType: 'Ordinary',
       PassportIssueDate: '2020-01-15',
       PassportExpiryDate: '2030-01-15',
       PassportIssuePlace: 'Algiers',  // BLS: Required!
       PassportIssueCountry: 'Algeria',
-      Email: sampleEmail,  // Unique email
+      Email: sampleEmail,  // REAL temporary email or fallback
       Mobile: '555123456',  // Valid format (no leading 0, 8-10 digits)
       PhoneCountryCode: '+213',
       BirthCountry: 'Algeria',
