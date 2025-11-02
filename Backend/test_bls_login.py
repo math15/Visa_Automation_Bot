@@ -25,10 +25,14 @@ async def test_login():
     
     # Get credentials from user
     email = input("📧 Enter your BLS email: ").strip()
-    password = input("🔒 Enter your password (optional, press Enter to skip): ").strip()
+    password = input("🔒 Enter your password: ").strip()
     
     if not email:
         print("❌ Email is required!")
+        return
+    
+    if not password:
+        print("❌ Password is required!")
         return
     
     print()

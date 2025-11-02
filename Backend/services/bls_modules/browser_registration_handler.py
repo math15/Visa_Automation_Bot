@@ -23,7 +23,7 @@ class BrowserRegistrationHandler:
         user_data: Dict[str, Any],
         cookies: Dict[str, str],
         proxy_url: str = None,
-        headless: bool = False,
+        headless: bool = True,
         email_service = None,
         email_service_name: str = None
     ) -> Tuple[bool, Dict[str, Any]]:
@@ -284,37 +284,29 @@ class BrowserRegistrationHandler:
                 email = user_data.get('Email')
                 
                 # Manual OTP entry - wait for user to input in console
-                logger.info("")
-                logger.info("="*80)
-                logger.info("📧 MANUAL OTP ENTRY REQUIRED")
-                logger.info("="*80)
-                logger.info(f"📧 Please check {email} and enter the OTP code in the console below:")
-                logger.info("="*80)
-                logger.info("")
+                print("\n" + "="*80)
+                print("📧 MANUAL OTP ENTRY REQUIRED")
+                print("="*80)
+                print(f"📧 Please check {email} and enter the OTP code below:")
+                print("="*80 + "\n")
                 
-                # Simple console input using threading (works with headless browsers)
-                import threading
-                otp_received = threading.Event()
-                user_otp = [None]
-                
-                def get_console_input():
-                    try:
-                        otp = input(f"📧 Please enter OTP code received at {email}: ").strip()
-                        user_otp[0] = otp
-                        otp_received.set()
-                    except:
-                        pass
-                
-                input_thread = threading.Thread(target=get_console_input)
-                input_thread.daemon = True
-                input_thread.start()
-                
-                # Wait for user input (with timeout) - this will block
-                otp_received.wait(timeout=300)  # 5 minutes timeout
-                otp_code = user_otp[0]
+                # Use asyncio.to_thread for non-blocking input in async context
+                try:
+                    otp_code = await asyncio.wait_for(
+                        asyncio.to_thread(input, f"📧 Please enter OTP code received at {email}: "),
+                        timeout=300.0  # 5 minutes timeout
+                    )
+                    if otp_code:
+                        otp_code = otp_code.strip()
+                    else:
+                        otp_code = None
+                except asyncio.TimeoutError:
+                    logger.error("❌ No OTP code received - timeout")
+                    await self.browser.close()
+                    return False, {'error': 'OTP timeout'}
                 
                 if not otp_code:
-                    logger.error("❌ No OTP code received - timeout or no input")
+                    logger.error("❌ No OTP code received - empty input")
                     await self.browser.close()
                     return False, {'error': 'OTP timeout'}
                 
@@ -602,9 +594,9 @@ class BrowserRegistrationHandler:
     async def _solve_captcha_automatically(self, timeout: int = 300) -> bool:
         """Automatically solve captcha using NoCaptchaAI with retry logic"""
         # Wrapper to add retry logic
-        return await self._solve_captcha_automatically_with_retry(timeout, retry_count=0, max_retries=3)
+        return await self._solve_captcha_automatically_with_retry(timeout, retry_count=0, max_retries=5)
     
-    async def _solve_captcha_automatically_with_retry(self, timeout: int = 300, retry_count: int = 0, max_retries: int = 3) -> bool:
+    async def _solve_captcha_automatically_with_retry(self, timeout: int = 300, retry_count: int = 0, max_retries: int = 5) -> bool:
         """Automatically solve captcha using NoCaptchaAI with retry on failure"""
         try:
             if retry_count > 0:
@@ -1137,15 +1129,15 @@ class BrowserRegistrationHandler:
                         else:
                             logger.error(f"❌ Max retries ({max_retries}) reached for captcha solving")
                             logger.info("💡 Falling back to manual solving...")
-                            return await self._wait_for_captcha_solved_manual(timeout=30)
+                            return await self._wait_for_captcha_solved_manual(timeout=300)
                     else:
                         logger.warning("⚠️ No captcha available, falling back to manual solving")
-                        return await self._wait_for_captcha_solved_manual(timeout=30)
+                        return await self._wait_for_captcha_solved_manual(timeout=300)
                 except Exception as iframe_error:
                     # If we can't access iframe, might mean captcha closed or navigation happened
                     logger.warning(f"⚠️ Could not check for new captcha: {iframe_error}")
                     logger.info("💡 Falling back to manual solving...")
-                    return await self._wait_for_captcha_solved_manual(timeout=30)
+                    return await self._wait_for_captcha_solved_manual(timeout=300)
             
         except Exception as e:
             logger.error(f"❌ Error in automatic captcha solving: {e}")

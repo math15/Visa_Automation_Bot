@@ -57,7 +57,6 @@ class BrowserLoginHandler:
                 '--disable-setuid-sandbox',
                 '--disable-web-security',
                 '--disable-features=IsolateOrigins,site-per-process',
-                f'--window-size=1,1',  # 1x1 pixel window
             ]
             
             browser_options = {
@@ -75,7 +74,7 @@ class BrowserLoginHandler:
             
             # Create context with comprehensive anti-bot headers
             context_options = {
-                'viewport': {'width': 1, 'height': 1},  # 1x1 pixel viewport
+                'viewport': {'width': 1366, 'height': 768},  # Normal desktop viewport
                 'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'locale': 'es-ES',
                 'timezone_id': 'Europe/Madrid',
@@ -225,45 +224,11 @@ class BrowserLoginHandler:
             logger.info("🔍 Step 3: Clicking Verify button...")
             await self._click_verify_button()
             
-            # Step 4: Get password from user input (if not provided) - password is sent to email after clicking Verify
+            # Step 4: Validate password is provided
             if not password:
-                logger.info("")
-                logger.info("="*80)
-                logger.info("🔒 MANUAL PASSWORD ENTRY REQUIRED")
-                logger.info("="*80)
-                logger.info(f"📧 Email: {email}")
-                logger.info("💡 Password/OTP has been sent to your email")
-                logger.info("💡 Please check your email and enter the password/OTP in the console below:")
-                logger.info("="*80)
-                logger.info("")
-                
-                # Simple console input using threading
-                import threading
-                password_received = threading.Event()
-                user_password = [None]
-                
-                def get_console_input():
-                    try:
-                        pwd = input(f"🔒 Please enter password/OTP received at {email}: ").strip()
-                        user_password[0] = pwd
-                        password_received.set()
-                    except:
-                        pass
-                
-                input_thread = threading.Thread(target=get_console_input)
-                input_thread.daemon = True
-                input_thread.start()
-                
-                # Wait for user input (with timeout)
-                password_received.wait(timeout=300)  # 5 minutes timeout
-                password = user_password[0]
-                
-                if not password:
-                    logger.error("❌ No password received - timeout or no input")
-                    await self.browser.close()
-                    return False, {'error': 'Password timeout'}
-                
-                logger.info("✅ Password received")
+                logger.error("❌ Password is required for login")
+                await self.browser.close()
+                return False, {'error': 'Password is required'}
             
             # Step 5: Fill password on the captcha page
             logger.info("🔐 Step 5: Filling password on captcha page...")
@@ -345,6 +310,8 @@ class BrowserLoginHandler:
                 () => {
                     // Get all text inputs in the form
                     const inputs = document.querySelectorAll('input[type="text"].entry-disabled');
+                    console.log(`Found ${inputs.length} text inputs with class 'entry-disabled'`);
+                    
                     for (let input of inputs) {
                         // Check the parent div's computed style and dimensions
                         const parentDiv = input.closest('.mb-3');
@@ -356,10 +323,14 @@ class BrowserLoginHandler:
                                             parentDiv.offsetWidth > 0 && 
                                             parentDiv.offsetHeight > 0;
                             
+                            console.log(`Input ${input.id}: visible=${isVisible}, offsetWidth=${parentDiv.offsetWidth}, offsetHeight=${parentDiv.offsetHeight}`);
+                            
                             if (isVisible) {
                                 console.log(`Found visible input: ${input.id}`);
                                 return input.id;
                             }
+                        } else {
+                            console.log(`Input ${input.id}: no .mb-3 parent found`);
                         }
                     }
                     return null;
@@ -374,6 +345,12 @@ class BrowserLoginHandler:
                 return True
             else:
                 logger.error("❌ Could not find visible email input field")
+                logger.info("💡 Taking screenshot for debugging...")
+                try:
+                    await self.page.screenshot(path="login_email_field_not_found.png")
+                    logger.info("📸 Screenshot saved as login_email_field_not_found.png")
+                except Exception as e:
+                    logger.error(f"❌ Failed to take screenshot: {e}")
                 return False
             
         except Exception as e:
@@ -428,7 +405,7 @@ class BrowserLoginHandler:
             
             try:
                 # Wait for iframe to be present (registration uses iframe)
-                iframe_element = await self.page.wait_for_selector('iframe.k-content-frame', timeout=30000)
+                iframe_element = await self.page.wait_for_selector('iframe.k-content-frame', timeout=10000)
                 logger.info("✅ Found captcha iframe")
                 
                 # Get the frame from the iframe element
