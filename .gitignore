@@ -156,6 +156,8 @@ Thumbs.db
 
 # Node.js (if any frontend components)
 node_modules/
+.next/
+.nx/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
