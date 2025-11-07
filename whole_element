@@ -1,0 +1,817 @@
+<body class="" style="">
+    <div class="preloader animate__animated animate__fadeOut" style="display: none;">
+        <div class="preloader-item">
+            <div class="spinner-grow text-primary"></div>
+        </div>
+    </div>
+    <div id="global-overlay" class="global-overlay" style="display: none;">
+        <div class="global-overlay-loader">
+        </div>
+    </div>
+    <header class="navbar-light header-sticky">
+        <!-- Nav START -->
+        <nav class="navbar navbar-expand-xl z-index-9 navbar-divider">
+            <div class="container">
+                <!-- Logo START -->
+                <a class="navbar-brand" href="/dza/home/index">
+                    <img class="light-mode-item navbar-brand-item" src="/assets/images/logo.png" alt="BLS Logo" title="BLS Logo">
+                    <img class="dark-mode-item navbar-brand-item" src="/assets/images/logo.png" alt="logo">
+                </a>
+                <!-- Logo END -->
+                <!-- Responsive navbar toggler -->
+                <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <i class="bi bi-search fs-4"> </i>
+                </button>
+
+                <!-- Responsive navbar toggler -->
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse2" aria-controls="navbarCollapse2" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-animation">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                </button>
+
+                <!-- Main navbar START -->
+                <div class="navbar-collapse collapse" id="navbarCollapse">
+                    <div class="col-md-9">
+                        <div class="nav my-3 my-xl-0 px-4 flex-nowrap align-items-center">
+                            <div class="nav-item w-100">
+                                <div class="align-items-center position-relative">
+                                    <div class="align-items-center text-primary" style="font-size:30px;font-weight:700;">Apply for VISA to Spain In Algeria</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="align-items-center position-relative">
+                            <small class="text-secondary mb-1">Follow us on</small>
+                            <ul class="list-inline mb-3 mt-0">
+                                <li class="list-inline-item"> <a class="btn btn-sm px-2 bg-facebook mb-0" href="/dza/home/sm?name=F" target="_blank" rel="noopener&nbsp;noreferrer"><i class="fab fa-fw fa-facebook-f"></i></a> </li>
+                                <li class="list-inline-item"> <a class="btn btn-sm shadow px-2 bg-instagram mb-0" href="/dza/home/sm?name=I" target="_blank" rel="noopener&nbsp;noreferrer"><i class="fab fa-fw fa-instagram"></i></a> </li>
+                                <li class="list-inline-item">
+                                    <a class="btn btn-sm shadow px-2 bg-twitter mb-0" href="/dza/home/sm?name=X" target="_blank"> <span style="font-size:14px; font-weight:900; display:inline-block; width:1.25em; text-align:center; line-height:1;">𝕏</span>
+                                    </a>
+                                </li>                                
+                                <li class="list-inline-item"> <a class="btn btn-sm shadow px-2 bg-linkedin mb-0" href="/dza/home/sm?name=L" target="_blank" rel="noopener&nbsp;noreferrer"><i class="fab fa-fw fa-linkedin-in"></i></a> </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main navbar END -->
+                <!-- Profile and notification START -->
+                <ul class="nav flex-row align-items-center list-unstyled ms-xl-auto">
+                    <li class="dropdown nav-item">
+                        <a class="nav-link small pb-2" href="#" role="button" id="languageDropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <img class="w-30px me-2" src="/assets/images/flags/en-US.svg" alt=""><small>English</small>
+                        </a>
+                        <ul class="dropdown-menu dropdown-animation dropdown-menu-end min-w-auto" aria-labelledby="languageDropdown">
+                            <li> <a class="dropdown-item me-4" href="javascript:OnLanguageChange('en-US');"><img class="fa-fw me-2" src="/assets/images/flags/en-US.svg" alt="">English</a> </li>
+                            <li> <a class="dropdown-item me-4" href="javascript:OnLanguageChange('es-ES');"><img class="fa-fw me-2" src="/assets/images/flags/es-ES.svg" alt="">Español</a> </li>
+                            <li> <a class="dropdown-item me-4" href="javascript:OnLanguageChange('fr-FR');"><img class="fa-fw me-2" src="/assets/images/flags/fr-FR.svg" alt="">Français</a> </li>
+                            <li> <a class="dropdown-item me-4" href="javascript:OnLanguageChange('ar-DZ');"><img class="fa-fw me-2" src="/assets/images/flags/ar-DZ.svg" alt="">عربي</a> </li>
+                        </ul>
+                    </li>
+                        <li class="nav-item ms-3 dropdown">
+                            <!-- Avatar -->
+                            <a class="avatar avatar-sm p-0 mt-0" href="#" id="profileDropdown" role="button" data-bs-auto-close="outside" data-bs-display="static" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <img onerror="OnPhotoError(this);" class="avatar-img rounded-2" src="/assets/images/avatar/01.jpg" alt="Profile">
+                            </a>
+
+                            <!-- Profile dropdown START -->
+                            <ul class="dropdown-menu dropdown-animation dropdown-menu-end shadow pt-3" aria-labelledby="profileDropdown">
+                                <!-- Profile info -->
+                                <li class="px-3 mb-3">
+                                    <div class="d-flex align-items-center">
+                                        <!-- Avatar -->
+                                        <div class="avatar me-3">
+                                                <img onerror="OnPhotoError(this);" class="avatar-img rounded-circle shadow" src="/assets/images/avatar/01.jpg" alt="Profile">
+
+                                        </div>
+                                        <div>
+                                            <a class="h6 mt-2 mt-sm-0" href="#">AHMED BENALI</a>
+                                            <p class="small m-0">frankfrank1252@gmail.com</p>
+                                        </div>
+                                    </div>
+                                </li>
+
+                                <!-- Links -->
+                                <li> <hr class="dropdown-divider"></li>
+                                <li></li>
+                                <li><a class="dropdown-item" href="/dza/account/DeleteUser"><i class="fa fa-trash fa-fw me-2"></i>Delete Account</a></li>
+                                <li><a class="dropdown-item" href="/dza/account/ChangePassword"><i class="fa fa-key fa-fw me-2"></i>Change Password</a></li>
+                                <li><a class="dropdown-item bg-danger-soft-hover" href="javascript:OnLogout();"><i class="fa fa-power-off me-2"></i>Logout</a></li>
+                                <li> <hr class="dropdown-divider"></li>
+
+                                <!-- Dark mode options START -->
+                                <!-- Dark mode options END-->
+                            </ul>
+                            <!-- Profile dropdown END -->
+                        </li>
+                    <!-- Profile dropdown START -->
+                    <!-- Profile dropdown END -->
+                </ul>
+                <!-- Profile and notification END -->
+            </div>
+        </nav>
+        <!-- Nav END -->
+        <!--Main menu link START -->
+        <nav class="navbar navbar-expand-xl navbar-divider">
+            <div class="container px-0">
+                <!-- Main navbar START -->
+                <div class="navbar-collapse w-100 collapse" id="navbarCollapse2">
+                    <ul class="navbar-nav nav-active-line navbar-nav-scroll">
+                        <li class="nav-item"> <a class="nav-link home-active" href="https://algeria.blsspainvisa.com"><i class="fa fa-home"></i></a>	</li>
+
+                        <!-- Nav item -->
+                        <li class="nav-item"> <a class="nav-link new-app-active" href="/dza/appointment/newappointment">Book New Appointment</a>	</li>
+                        <!-- Nav item -->
+
+                       <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle my-app-active" href="#" id="pageMenu" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Manage Appointments</a>
+                            <ul class="dropdown-menu" aria-labelledby="pageMenu">
+
+                                <li>
+                                    <a class="dropdown-item" href="/dza/appointmentdata/BLSCancelAppointment">
+                                        <i class="text-danger fa-regular fa-calendar-xmark me-2"></i>Cancel Appointment
+                                    </a>
+                                </li>
+
+                                <li>
+                                    <a class="dropdown-item" href="/dza/appointmentdata/BLSReprintAppointmentLetter">
+                                        <i class="text-info fa-solid fa-print me-2"></i>Re-Print Appointment Letter
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="/dza/appointmentdata/myappointments">
+                                        <i class="text-info fa-solid fa-users me-2"></i>Manage Applicants
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <li class="nav-item"><a class="nav-link doorstep-active text-primary fw-bolder" target="_blank" href="https://bls.schengen.europ-assistance.com/en?ipc=blsalgeria&amp;utm_source=blsalgeria&amp;utm_medium=affiliates">Travel Insurance</a></li>
+
+
+                    </ul>
+
+                </div>
+                <!-- Main navbar END -->
+            </div>
+        </nav>
+        <!--Main menu link END -->
+    </header><div id="sticky-space" style="height: 0px;"></div>
+    <!-- **************** MAIN CONTENT START **************** -->
+    <main>
+        
+
+<style>
+    .grid-menu {
+        padding: 8px 13px;
+        background-color: #e6e6e6;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    .ag-cell {
+        text-align: center;
+    }
+</style>
+
+<script>
+    var locationData = [{"Id":"8457a52e-98be-4860-88fc-2ce11b80a75e","Name":"Oran","Code":"ORAN","VisaTypeIds":"[\"ec08e478-17f2-4516-914c-4d9198fd8d1e\",\"5f9080db-049c-4e6e-b03c-7c5e2c5b6037\",\"8b24a19f-c120-4c5c-b924-d42eb3151840\"]","MissionId":"7b831dab-5bed-4f9e-9e13-a301dfce2d77"},{"Id":"0566245a-7ba1-4b5a-b03b-3dd33e051f46","Name":"Algiers","Code":"ALGIERS","VisaTypeIds":"[\"c805c157-7e8f-4932-89cf-d7ab69e1af96\",\"9d8b5d90-d9e6-454a-bd0a-1dd81878f0a9\",\"5f9080db-049c-4e6e-b03c-7c5e2c5b6037\",\"8b24a19f-c120-4c5c-b924-d42eb3151840\"]","MissionId":"ec336bcf-29fe-4d76-90f1-a7ae2d74d78b"}];
+    var visaTypeData = [{"Id":"ec08e478-17f2-4516-914c-4d9198fd8d1e","Name":"National Visa","VisaTypeCode":"NATIONAL_VISA","AppointmentSource":null},{"Id":"c805c157-7e8f-4932-89cf-d7ab69e1af96","Name":"Schengen Visa","VisaTypeCode":"SCHENGEN_VISA","AppointmentSource":null},{"Id":"9d8b5d90-d9e6-454a-bd0a-1dd81878f0a9","Name":"Schengen visa ( Estonia)","VisaTypeCode":"SCHENGEN_VISA_ESTONIA","AppointmentSource":"WEB_BLS"},{"Id":"5f9080db-049c-4e6e-b03c-7c5e2c5b6037","Name":"First application / première demande","VisaTypeCode":"SCHENGEN_VISA","AppointmentSource":"WEB_BLS"},{"Id":"8b24a19f-c120-4c5c-b924-d42eb3151840","Name":"Visa renewal / renouvellement de visa","VisaTypeCode":"SCHENGEN_VISA_EXISTING","AppointmentSource":"WEB_BLS"}];
+    var vtf = [];
+    function vt_change(e) {
+        var dataItem = e.sender.dataItem();
+        // if (dataItem.VisaTypeCode === 'SCHENGEN_VISA_EXISTING') {
+        //     $('#existingVisatype').modal('show');
+        // }
+        // if (dataItem.VisaTypeCode === 'SCHENGEN_VISA_CASA_ONE') {
+        //     $('#Casa1Visatype').modal('show');
+        // }
+        // else if (dataItem.VisaTypeCode === 'SCHENGEN_VISA_CASA_TWO') {
+        //     $('#Casa2Visatype').modal('show');
+        // }
+        // else if (dataItem.VisaTypeCode === 'SCHENGEN_VISA_CASA_THREE') {
+        //     $('#Casa3Visatype').modal('show');
+        // }
+    }
+    $(document).ready(function () {
+        $("#VisaType").kendoDropDownList({
+            optionLabel: "--Select--",
+            dataTextField: "Name",
+            dataValueField: "Id",
+            autoBind: true,
+            //filter: "contains",
+            value: '',
+            //change: LoadAppointmentDates,
+            change: vt_change,
+            dataSource: vtf
+        });
+        $("#LocationId").kendoDropDownList({
+            optionLabel: "--Select--",
+            dataTextField: "Name",
+            dataValueField: "Id",
+            autoBind: true,
+            //filter: "contains",
+            value: '',
+            change: onLocationChange,
+            dataSource: locationData
+        });
+
+    });
+
+    function onLocationChange() {
+        debugger;
+        var location = $("#LocationId").data('kendoDropDownList');
+        if (location.dataItem().VisaTypeIds != null) {
+            vtf = visaTypeData.filter(v => location.dataItem().VisaTypeIds.includes(v.Id));
+            $("#VisaType").data("kendoDropDownList").setDataSource(vtf);
+        }
+        //var loc = $("#LocationId").val();
+        //vtf = visaTypeData.filter(v => v.LocationId === loc);
+        //$("#VisaType").data("kendoDropDownList").setDataSource(vtf);
+    }
+    function FillApplication(appId, no, service, statusCode) {
+
+        if (statusCode == "BLS_APPOINTMENT_CANCELED") {
+            alert("Appointment is Cancellet, You cannot fill Application");
+            return;
+        }
+        if (no == 1) {
+            //var returnurl = window.location.href;
+            window.location = '/dza/blsapplication/ManageApplication?serviceId=' + appId;
+        }
+        else {
+            var url = '/dza/blsapplication/FillVisaApplicationList?serviceId=' + appId;
+            //var win = GetMainWindow();
+            //win.iframeOpenUrl = url;
+            //win.OpenWindow({ Title: 'Fill Visa Application', Width: 1000, Height: 700 });
+            window.location = url;
+            return false;
+        }
+
+    }
+    function LoadManageApplication(appId, id) {
+
+        var returnurl = window.location.href;
+        var url = '/dza/blsapplication/ManageApplication?serviceId=' + appId + "&id=" + id;
+        window.location = url;
+
+    }
+    var editId;
+    function ManageApplicant(id, type, locationId) {
+        ShowLoader();
+        editId = id;
+        var location = $("#LocationId").data('kendoDropDownList');
+        location.value(locationId);
+        if (location.dataItem().VisaTypeIds != null) {
+            vtf = visaTypeData.filter(v => location.dataItem().VisaTypeIds.includes(v.Id));
+        }
+        var vt = $("#VisaType").data("kendoDropDownList");
+        vt.setDataSource(vtf);
+        vt.value(type);
+        if (id === '' || id === null || id === undefined) {
+            $("#LocationId").data("kendoDropDownList").select(0);
+        }
+
+        $.ajax({
+            url: "/dza/appointmentdata/IsAppointmentExist?id=" + editId,
+            success: function (result) {
+                HideLoader();
+                if (result.success) {
+                    $('#editAlert').modal('show');
+                    return false;
+                }
+                else {
+                    $('#visaTypeModal').modal('show');
+                    return false;
+                }
+            },
+            error: function (err) {
+                HideLoader();
+                ShowError(err);
+
+            }
+        });
+
+
+    }
+    function VisaTypeProceed() {
+        var locId = $("#LocationId").val();
+        if (locId === null || locId === '' || locId === undefined) {
+            alert('Please select your location');
+            return false;
+        }
+        var vtId = $("#VisaType").val();
+        if (vtId === null || vtId === '' || vtId === undefined) {
+            alert('Please select your visa type');
+            return false;
+        }
+        var win = GetMainWindow();
+        win.iframeOpenUrl = '/dza/appointmentdata/ManageApplicant?userId=ab3cc1a2-eabc-444c-8ecd-7d292f78eaf4&id=' + editId + '&visaTypeId=' + vtId + '&locationId=' + locId;
+        win.OpenWindow({ Title: "ManageApplicant", Width: 1200, Height: 650 });
+        $('#visaTypeModal').modal('hide');
+        return false;
+    }
+    var viewId;
+    function ViewApplicant(id, type, locationId) {
+        viewId = id;
+
+        // $("#LocationId").data("kendoDropDownList").value(locationId);
+        // vtf = visaTypeData.filter(v => v.Id === type);
+        // $("#VisaType").data("kendoDropDownList").setDataSource(vtf);
+        // $("#VisaType").data("kendoDropDownList").select(1);
+        // if (id === '' || id === null || id === undefined) {
+        //     $("#LocationId").data("kendoDropDownList").select(0);
+        // }
+        var win = GetMainWindow();
+        win.iframeOpenUrl = '/dza/appointmentdata/ViewApplicant?userId=ab3cc1a2-eabc-444c-8ecd-7d292f78eaf4&id=' + viewId;
+        win.OpenWindow({ Title: "ViewApplicant", Width: 1200, Height: 650 });
+
+        return false;
+
+    }
+    var deleteId = '';
+    function DeleteApplicant(id) {
+        deleteId = id;
+        $('#confirmDeleteModal').modal('show');
+        return false;
+    }
+   
+</script>
+
+
+
+<div class="modal fade" id="rescheduleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="familyModalLabel">Reschedule Appointment</h6>
+            </div>
+            <div class="modal-body scam-body">
+                <span style="font-weight:500">
+                    This feature is currently unavailable at your location
+                </span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal">Ok</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cancelConfirm" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="familyModalLabel">Confirm Cancellation</h6>
+            </div>
+            <div class="modal-body scam-body">
+                <span style="font-weight:500">
+                    
+                </span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" data-bs-dismiss="modal">No</button>
+                <button class="btn btn-success" type="button" data-bs-dismiss="modal" onclick="return cancelconfirm();">Yes</button>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div id="appWrapper" class="wrapper">
+    <section class="p-5">
+        <div class="row g-2 g-lg-4">
+
+            <!-- Sidebar START -->
+            <!-- Sidebar END -->
+            <!-- Main content START -->
+            <div class="col-12">
+
+                <div class="card border bg-transparent">
+                    <!-- Card header -->
+                    <div class="card-header bg-transparent border-bottom text-center">
+                        <h5 class="card-header-title">Manage Applicants</h5>
+                    </div>
+                    <!-- Card body START -->
+                    <div class="card-body p-0">
+                        <!-- Tabs -->
+                        <ul class="nav nav-tabs nav-bottom-line nav-responsive nav-justified" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <a class="nav-link mb-0 active text-info" data-bs-toggle="tab" href="#tab-0" aria-selected="true" role="tab"><i class="bi bi-plus-circle-fill fa-fw me-1"></i>Manage Applicants &amp; Family Members</a>
+                            </li>
+
+                        </ul>
+
+                        <!-- Tabs content START -->
+                        <div class="tab-content p-2 p-sm-4" id="nav-tabContent">
+                            <!-- Tab content item START -->
+                            <div class="tab-pane fade show active" id="tab-0" role="tabpanel">
+                                <div class="row">
+                                    <div class="col-12 alert alert-warning">
+                                        Please complete the visa application form for all your family members before you go for an appointment
+                                    </div>
+                                    <!-- Sidebar START -->
+                                    <div class="col-lg-4 col-xl-3 col-sm-12">
+                                        <!-- Responsive offcanvas body START -->
+                                        <div class="offcanvas-end" tabindex="-1" asp-for="offcanvasSidebar">
+                                            <!-- Offcanvas body -->
+                                            <div class="offcanvas-body p-3 p-lg-0">
+                                                <div class="card bg-light w-100">
+                                                    <!-- Card body START -->
+                                                    <div class="card-body p-3">
+                                                            <div class="text-center mb-3">
+                                                                <ul class="nav nav-pills-primary-soft flex-column">
+                                                                    <li class="nav-item">
+                                                                        <a class="btn btn-info-soft" href="#" onclick="ManageApplicant(''); return false;"><i class="fas fa-plus fa-fw me-2"></i>Add New Member</a>
+                                                                    </li>
+                                                                </ul>
+                                                                <hr>
+                                                                <div class="alert alert-light">Click 'Add New Member' to add visa application form for all your family members.</div>
+                                                            </div>
+                                                    </div>
+                                                    <!-- Card body END -->
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Responsive offcanvas body END -->
+                                    </div>
+                                    <div class="col-lg-8 col-xl-9 col-sm-12">
+                                            <div class="row">
+                                                <div class="col-12 text-center">
+                                                    <h6>Applicant Details</h6>
+                                                    <hr>
+                                                </div>
+                                            </div>
+                                            <div class="row p-3 d-none d-sm-flex d-sm-none d-md-flex">
+                                                <div class="col-md col-sm-12 fw-bold">
+                                                    Applicant Name
+                                                </div>
+                                                <div class="col-md col-sm-12 fw-bold">
+                                                    Relationship
+                                                </div>
+                                                <div class="col-md col-sm-12 fw-bold">
+                                                    Date Of Birth
+                                                </div>
+                                                <div class="col-md col-sm-12 fw-bold">
+                                                    Location
+                                                </div>
+                                                <div class="col-md col-sm-12 fw-bold">
+                                                    Visa Type
+                                                </div>
+                                                <div class="col-md col-sm-12 fw-bold">
+                                                    Status
+                                                </div>
+                                                <div class="col-md col-sm-12 fw-bold">
+                                                    Actions
+                                                </div>
+
+                                            </div>
+                                                <div class="row border p-3 rounded-3 mb-2">
+                                                    <div class="col-md-2 col-sm-12 pb-2">
+                                                        <span class="d-none d-sm-inline d-md-inline d-lg-none pr-1">Applicant Name:</span>BENALI  AHMED BENALI
+                                                    </div>
+                                                    <div class="col-md col-sm-12 pb-2">
+                                                        <span class="d-none d-sm-inline d-md-inline d-lg-none pr-1">Relationship:</span>
+                                                            <span>Primary Applicant</span>
+
+                                                    </div>
+                                                    <div class="col-md col-sm-12 pb-2">
+                                                            <span class="d-none d-sm-inline d-md-inline d-lg-none pr-1">Date Of Birth:</span>
+1990-05-15
+                                                    </div>
+                                                    <div class="col-md col-sm-12 pb-2">
+                                                        
+                                                    </div>
+                                                    <div class="col-md col-sm-12 pb-2">
+                                                        
+                                                    </div>
+                                                    <div class="col-md col-sm-12 pb-2">
+                                                        <span class="d-none d-sm-inline d-md-inline d-lg-none pr-1">Status:</span>
+                                                        <b>
+                                                            <span class="text-danger">Not Completed</span>
+                                                        </b>
+                                                    </div>
+                                                    <div class="col-md col-sm-12">
+                                                        <span class="d-none d-sm-inline d-md-inline d-lg-none pr-1">Actions:</span>
+                                                        <a title="Edit/Complete Applicant Details" href="#" onclick="ManageApplicant('1f66fc1c-2630-47fa-9ab5-e5747e6ca810','',''); return false;" class="rounded-circle p-2 btn-info-soft"><b class="fa fa-edit fs-5"></b></a>
+                                                    </div>
+                                                </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Tabs content item END -->
+                            <!-- Tab content item START -->
+                          
+                            <!-- Tabs content item END -->
+                        </div>
+
+                    </div>
+                    <!-- Card body END -->
+                </div>
+
+            </div>
+            <!-- Main content END -->
+        </div>
+    </section>
+</div>
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" role="dialog" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">  <span style="font-weight:600;color:black">Confirm Delete Member</span></h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close">
+                </button>
+
+            </div>
+            <div class="modal-body scam-body" style="color:black;font-size:medium">
+                <span>
+                    Are You Sure Want To Delete Member.
+                </span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-danger" type="button" onclick="DeleteConfirm();">Delete</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="visaTypeModal" tabindex="-1" aria-labelledby="visaTypeModalLabel" aria-hidden="true" style="display: none;">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">  <span style="font-weight:600;color:black">Select Your Location &amp; Visa Type</span></h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close">
+                </button>
+
+            </div>
+            <div class="modal-body" style="height:200px;">
+                <div class="col-12">
+                    <label class="form-label">Location<span class="required">*</span></label>
+                    <span title="" class="k-widget k-dropdown form-control" unselectable="on" role="listbox" aria-haspopup="listbox" aria-expanded="false" tabindex="0" aria-owns="LocationId_listbox" aria-live="polite" aria-disabled="false" aria-readonly="false" aria-busy="false" style="" aria-activedescendant="df8df023-d80d-4c2b-a068-5481604ae1b5"><span unselectable="on" class="k-dropdown-wrap k-state-default"><span id="df8df023-d80d-4c2b-a068-5481604ae1b5" unselectable="on" role="option" aria-selected="true" class="k-input">Oran</span><span unselectable="on" class="k-select" aria-label="select"><span class="k-icon k-i-arrow-60-down"></span></span></span><input id="LocationId" class="form-control" type="text" name="LocationId" value="" data-role="dropdownlist" style="display: none;"></span>
+                </div>
+                <div class="col-12 pt-3">
+                    <label class="form-label">Visa Type<span class="required">*</span></label>
+                    <span title="" class="k-widget k-dropdown form-control" unselectable="on" role="listbox" aria-haspopup="listbox" aria-expanded="false" tabindex="0" aria-owns="VisaType_listbox" aria-live="polite" aria-disabled="false" aria-readonly="false" aria-busy="false" style="" aria-activedescendant="q21108a0-42a6-4885-8a8c-9f4de794de0e"><span unselectable="on" class="k-dropdown-wrap k-state-default"><span id="q21108a0-42a6-4885-8a8c-9f4de794de0e" unselectable="on" role="option" aria-selected="true" class="k-input">First application / première demande</span><span unselectable="on" class="k-select" aria-label="select"><span class="k-icon k-i-arrow-60-down"></span></span></span><input id="VisaType" class="form-control" type="text" name="VisaType" value="" data-role="dropdownlist" style="display: none;"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" type="button" onclick="VisaTypeProceed();">Proceed</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editAlert" tabindex="-1" role="dialog" aria-labelledby="editAlertModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">  <span style="font-weight:600;" class="text-danger">AppointmentExistHeader</span></h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close">
+                </button>
+
+            </div>
+            <div class="modal-body" style="height:100px;">
+                An appointment is already booked for this member. You cannot edit the details until that appointment is completed.
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">OK</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="existingVisatype" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog" aria-labelledby="familyModal" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content rounded border border-dark">
+            <div class="modal-header">
+                <h6 class="modal-title" id="familyModal">SchengenVisaPreviousVisa</h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body scam-body">
+                <span style="font-weight:500">
+                    PreSchengenVisaHolder
+                </span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" type="button" data-bs-dismiss="modal">Ok</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="Casa1Visatype" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog" aria-labelledby="familyModal" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content rounded border border-dark">
+            <div class="modal-header">
+                <h6 class="modal-title" id="familyModal">CASA 1</h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body scam-body">
+                <span style="font-weight:500">
+                    CASA1
+                </span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" type="button" data-bs-dismiss="modal">Ok</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="Casa2Visatype" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog" aria-labelledby="familyModal" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content rounded border border-dark">
+            <div class="modal-header">
+                <h6 class="modal-title" id="familyModal">CASA 2</h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body scam-body">
+                <span style="font-weight:500">
+                    CASA2
+                </span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" type="button" data-bs-dismiss="modal">Ok</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="Casa3Visatype" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog" aria-labelledby="familyModal" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content rounded border border-dark">
+            <div class="modal-header">
+                <h6 class="modal-title" id="familyModal">CASA 3</h6>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body scam-body">
+                <span style="font-weight:500">
+                    CASA3
+                </span>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" type="button" data-bs-dismiss="modal">Ok</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    </main>
+    <!-- **************** MAIN CONTENT END **************** -->
+    <!-- =======================
+    Footer START -->
+    <footer class="bg-dark pt-5">
+        <div class="container">
+            <!-- Row START -->
+            <div class="row g-4">
+
+                <!-- Widget 1 START -->
+                <div class="col-lg-3">
+                    <!-- logo -->
+                    <a href="index.html">
+                        <img class="h-40px" src="/assets/images/logo.png" alt="logo">
+                    </a>
+                    <h4 class="my-3 text-primary">BLS International</h4>
+                </div>
+                <!-- Widget 1 END -->
+                <!-- Widget 2 START -->
+                <div class="col-lg-8 ms-auto">
+                    <div class="row g-4">
+                        <!-- Link block -->
+
+                        <!-- Link block -->
+
+                        <!-- Link block -->
+
+                        <!-- Link block -->
+                    </div>
+                </div>
+                <!-- Widget 2 END -->
+
+            </div><!-- Row END -->
+
+            <!-- Divider -->
+            <hr class="mt-4 mb-0">
+
+            <!-- Bottom footer -->
+            <div class="row">
+                <div class="container">
+                    <div class="d-lg-flex justify-content-between align-items-center py-3 text-center text-lg-start">
+                        <!-- copyright text -->
+                        <div class="text-muted text-primary-hover">©BLS International2025</div>
+                        <!-- copyright links-->  
+                        <div class="nav mt-2 mt-lg-0">
+                            <small class="list-inline-item me-0">V:&nbsp;6.59</small>
+                        </div>
+                    </div>                  
+                </div>
+            </div>
+        </div>
+    </footer>
+    <!-- =======================
+    Footer END -->
+    <!-- Back to top -->
+    <div class="back-top"></div>
+    <!-- Bootstrap JS -->
+
+    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="scamModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title" id="scamModalLabel">  <span style="font-weight:600;color:black">Ready to Leave?</span></h6>
+                    <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close">
+                    </button>
+
+                </div>
+                <div class="modal-body scam-body" style="color:black;font-size:medium">
+                    <span>
+                        Select "Logout" below if you are ready to end your current session.
+                    </span>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-danger" type="button" onclick="OnLogoutSubmit();">Logout</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <script src="/assets/vendor/bootstrap/dist/js/bootstrap.bundle.min.js?v=Bh8LHqeebiyiT0YD5V0-kJ90cboLJ5zbbepAVUEGxqI"></script>
+
+    <!-- Vendors -->
+    <script src="/assets/vendor/tiny-slider/tiny-slider.js?v=TUoRPxlDCbgCqz7qhneDUfttB5a74WlyYrm3FOjFZnU"></script>
+    <script src="/assets/vendor/purecounterjs/dist/purecounter_vanilla.js?v=faMnyiv1xv8mqVhNEZAf8nONW6FTf7T0o40mEeleNsQ"></script>
+    <script src="/assets/vendor/glightbox/js/glightbox.js?v=r0f52UVK7WXq6iGxjyhjV-Y2WjDtpwawIrQaoBtwqE4"></script>
+    <script src="/assets/vendor/flatpickr/js/flatpickr.min.js?v=AkQap91tDcS4YyQaZY2VV34UhSCxu2bDEIgXXXuf5Hg"></script>
+    <script src="/assets/vendor/choices/js/choices.min.js?v=GGLVnYaVIFDbccxWOhWJiXbdGgmWv7nDSer8VyCQSBk"></script>
+    <script src="/assets/vendor/jarallax/jarallax.min.js?v=051mEhTXV1pINFHbbB6peqpAeo2lEkRMtXVe59eo8Xo"></script>
+    <script src="/assets/vendor/jarallax/jarallax-video.min.js?v=hfysllUmwJ3on3niY5cibYd5iwOz1MZ-A5aKYxeD0fw"></script>
+
+    <!-- ThemeFunctions -->
+    <script src="/assets/js/functions.js?v=TbMKeJx-U07R1sXdRBqHpmGBu1Oh1AfWjFjDMY8fuOA"></script>
+    <script src="/js/site.js?v=KZhE6R9IutBwAcH2dhNWj-BkFRm9WXFHt-59TQi7rAo"></script>
+
+    <script>
+        var iframeOpenUrl = "";
+        var globalPopups = GetStack();
+        var globalCallBack = null;
+        var globalWindowSender = null;
+        function OnLanguageChange(lng) {
+
+            if (lng === 'en-US') {
+                return false;
+            }
+            ShowLoader();
+            $.ajax({
+                type: "POST",
+                url: "/dza/account/ChangeLanguage?hdnLang=" +lng,
+                success: function (response) {
+                    HideLoader();
+                    if (response != "" && response != null && response.success === true) {
+                        window.location.href = window.location.href;
+                    }
+                },
+                error: function (response) {
+                    HideLoader();
+                    alert("error");
+                },
+            });
+              return false;
+        }
+        function OnLogout() {
+            $('#logoutModal').modal('show');
+        }
+        function OnLogoutSubmit() {
+            ShowLoader();
+            $.ajax({
+                type: "POST",
+                url: "/dza/account/logout",
+                success: function (response) {
+                    HideLoader();
+                    if (response != "" && response != null && response.success === true) {
+                        window.location.href = response.ru;
+                    }
+                },
+                error: function (response) {
+                    HideLoader();
+                    alert(response.error);
+                },
+            });
+            return false;
+        }
+    </script>
+    
+    <script src="/assets/vendor/jquery-context-menu/dist/jquery.contextMenu.min.js?v=dnQLKKKZdTgZllF5HiBr9GNTeybFM5J3gxxTJZ81xvw"></script>
+    <script src="/assets/vendor/jquery-context-menu/dist/jquery.ui.position.min.js?v=80s5IaNyffPb-Y7WMQCoei-jvLzxkGx4JjG17HwWdpY"></script>
+    <script src="/assets/vendor/kendo/js/kendo.all.min.js?v=PO_iEpMMumS6ezVxpHt1IpXsBBwz5RAz-jXCrshdYLM"></script>
+
+
+
+<div class="k-animation-container" style="width: 438px; height: 129.188px; box-sizing: content-box; overflow: hidden; top: 526.688px; z-index: 10002; left: 741px; display: none; position: absolute;" aria-hidden="true"><div class="k-list-container k-popup k-group k-reset" id="VisaType-list" data-role="popup" aria-hidden="true" style="position: absolute; font-size: 16px; font-family: &quot;DM Sans&quot;, sans-serif; font-stretch: 100%; font-style: normal; font-weight: 400; line-height: normal; width: 432px; min-width: 432px; white-space: normal; height: auto; display: none; transform: translateY(-129.188px);"><div class="k-list-optionlabel">--Select--</div><div class="k-group-header" style="display:none"></div><div class="k-list-scroller" unselectable="on" style="height: auto;"><ul unselectable="on" class="k-list k-reset" tabindex="-1" aria-hidden="true" id="VisaType_listbox" aria-live="off" data-role="staticlist" role="listbox"><li tabindex="-1" role="option" unselectable="on" class="k-item" aria-selected="false" data-offset-index="0">National Visa</li><li tabindex="-1" role="option" unselectable="on" class="k-item k-state-focused k-state-selected" aria-selected="true" data-offset-index="1" id="sc9c4a31-9957-467e-b25b-482b56eb4a27">First application / première demande</li><li tabindex="-1" role="option" unselectable="on" class="k-item" aria-selected="false" data-offset-index="2">Visa renewal / renouvellement de visa</li></ul></div><div class="k-nodata" style="display: none;"><div>No data found.</div></div></div></div><div class="k-animation-container" style="width: 438px; height: 98.3906px; box-sizing: content-box; overflow: hidden; top: 444.594px; z-index: 10002; left: 741px; display: none; position: absolute;" aria-hidden="true"><div class="k-list-container k-popup k-group k-reset" id="LocationId-list" data-role="popup" aria-hidden="true" style="position: absolute; font-size: 16px; font-family: &quot;DM Sans&quot;, sans-serif; font-stretch: 100%; font-style: normal; font-weight: 400; line-height: normal; width: 432px; min-width: 432px; white-space: normal; height: auto; display: none; transform: translateY(-98.3906px);"><div class="k-list-optionlabel">--Select--</div><div class="k-group-header" style="display:none"></div><div class="k-list-scroller" unselectable="on" style="height: auto;"><ul unselectable="on" class="k-list k-reset" tabindex="-1" aria-hidden="true" id="LocationId_listbox" aria-live="off" data-role="staticlist" role="listbox"><li tabindex="-1" role="option" unselectable="on" class="k-item k-state-focused k-state-selected" aria-selected="true" data-offset-index="0" id="c9a902fe-1a0c-45bd-be38-22231458b5a0">Oran</li><li tabindex="-1" role="option" unselectable="on" class="k-item" aria-selected="false" data-offset-index="1">Algiers</li></ul></div><div class="k-nodata" style="display:none"><div>No data found.</div></div></div></div><div class="k-overlay" style="z-index: 10002; display: block; opacity: 0.5;"></div><div class="k-widget k-window" tabindex="0" data-role="draggable" style="min-width: 90px; min-height: 50px; width: 1200px; height: 650px; top: 151.5px; left: 360px; z-index: 10003;"><div class="k-window-titlebar"><span class="k-window-title" id="popup_1_wnd_title">ManageApplicant</span><div class="k-window-actions"><a role="button" href="#" class="k-button k-flat k-button-icon k-window-action" aria-label="window-Maximize"><span class="k-icon k-i-window-maximize"></span></a><a role="button" href="#" class="k-button k-flat k-button-icon k-window-action" aria-label="Close"><span class="k-icon k-i-close"></span></a></div></div><div id="popup_1" data-role="window" class="k-window-content k-window-iframecontent" role="dialog" aria-labelledby="popup_1_wnd_title" style=""><iframe frameborder="0" title="ManageApplicant" class="k-content-frame" src="/dza/appointmentdata/ManageApplicant?userId=ab3cc1a2-eabc-444c-8ecd-7d292f78eaf4&amp;id=1f66fc1c-2630-47fa-9ab5-e5747e6ca810&amp;visaTypeId=5f9080db-049c-4e6e-b03c-7c5e2c5b6037&amp;locationId=8457a52e-98be-4860-88fc-2ce11b80a75e">This page requires frames in order to show content</iframe></div><div class="k-resize-handle k-resize-n"></div><div class="k-resize-handle k-resize-e"></div><div class="k-resize-handle k-resize-s"></div><div class="k-resize-handle k-resize-w"></div><div class="k-resize-handle k-resize-se"></div><div class="k-resize-handle k-resize-sw"></div><div class="k-resize-handle k-resize-ne"></div><div class="k-resize-handle k-resize-nw"></div></div></body>
