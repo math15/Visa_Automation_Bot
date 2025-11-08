@@ -52,6 +52,14 @@ interface FormData {
   NumberOfMembers: number;
   Relationship: string;
   PrimaryApplicant: boolean;
+  Category: string;
+  Location: string;
+  VisaType: string;
+  VisaSubType: string;
+  PreviousVisaNumber: string;
+  PreviousVisaIssuedCountry: string;
+  PreviousVisaValidFrom: string;
+  PreviousVisaValidTo: string;
   
   // Account Credentials
   Password: string;
@@ -89,6 +97,14 @@ export default function CreateAccountPage() {
     NumberOfMembers: 1,
     Relationship: 'Self',
     PrimaryApplicant: true,
+    Category: 'Prime Time',
+    Location: 'Algiers',
+    VisaType: 'Visa Renewal',
+    VisaSubType: 'ALG 4',
+    PreviousVisaNumber: '',
+    PreviousVisaIssuedCountry: '',
+    PreviousVisaValidFrom: '',
+    PreviousVisaValidTo: '',
     Password: 'Supersecret123@',  // Hidden default password
     ConfirmPassword: 'Supersecret123@'  // Hidden default password
   });
@@ -139,6 +155,14 @@ export default function CreateAccountPage() {
         NumberOfMembers: parseInt(urlParams.get('number_of_members') || '1'),
         Relationship: urlParams.get('relationship') || 'Self',
         PrimaryApplicant: urlParams.get('primary_applicant') === 'true',
+        Category: urlParams.get('category') || 'Prime Time',
+        Location: urlParams.get('location') || 'Algiers',
+        VisaType: urlParams.get('visa_type') || 'Visa Renewal',
+        VisaSubType: urlParams.get('visa_sub_type') || 'ALG 4',
+        PreviousVisaNumber: urlParams.get('previous_visa_number') || '',
+        PreviousVisaIssuedCountry: urlParams.get('previous_visa_issued_country') || '',
+        PreviousVisaValidFrom: urlParams.get('previous_visa_valid_from') || '',
+        PreviousVisaValidTo: urlParams.get('previous_visa_valid_to') || '',
         
         // Account Credentials
         Password: urlParams.get('password') || '',
@@ -352,6 +376,14 @@ export default function CreateAccountPage() {
           NumberOfMembers: 1,
           Relationship: 'Self',
           PrimaryApplicant: true,
+          Category: 'Prime Time',
+          Location: 'Algiers',
+          VisaType: 'Visa Renewal',
+          VisaSubType: 'ALG 4',
+          PreviousVisaNumber: '',
+          PreviousVisaIssuedCountry: '',
+          PreviousVisaValidFrom: '',
+          PreviousVisaValidTo: '',
           Password: '',
           ConfirmPassword: ''
         });
@@ -422,6 +454,14 @@ export default function CreateAccountPage() {
       NumberOfMembers: 1,
       Relationship: 'Self',
       PrimaryApplicant: true,
+      Category: 'Prime Time',
+      Location: 'Algiers',
+      VisaType: 'Visa Renewal',
+      VisaSubType: 'ALG 4',
+      PreviousVisaNumber: 'ALG2022-456789',
+      PreviousVisaIssuedCountry: 'Algeria',
+      PreviousVisaValidFrom: '2022-04-01',
+      PreviousVisaValidTo: '2023-03-31',
       Password: 'Supersecret123@',  // Hidden default password
       ConfirmPassword: 'Supersecret123@'  // Hidden default password
     };
@@ -929,6 +969,113 @@ Please check if the backend is running on http://localhost:8000`);
                   <option value="Parent">Parent</option>
                   <option value="Other">Other</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="Category">Category</Label>
+                <select
+                  id="Category"
+                  value={formData.Category}
+                  onChange={(e) => handleInputChange('Category', e.target.value)}
+                  className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                >
+                  <option value="Normal">Normal</option>
+                  <option value="Premium">Premium</option>
+                  <option value="Prime Time">Prime Time</option>
+                  <option value="Auto">Auto</option>
+                  <option value="Vip">Vip</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="Location">Location</Label>
+                <select
+                  id="Location"
+                  value={formData.Location}
+                  onChange={(e) => handleInputChange('Location', e.target.value)}
+                  className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                >
+                  <option value="Algiers">Algiers</option>
+                  <option value="Oran">Oran</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="VisaType">Visa Type</Label>
+                <select
+                  id="VisaType"
+                  value={formData.VisaType}
+                  onChange={(e) => handleInputChange('VisaType', e.target.value)}
+                  className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                >
+                  <option value="First Application">First Application</option>
+                  <option value="Visa Renewal">Visa Renewal</option>
+                  <option value="Schengen Visa(Estonia)">Schengen Visa(Estonia)</option>
+                  <option value="National Visa">National Visa</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="VisaSubType">Visa Sub Type</Label>
+                <select
+                  id="VisaSubType"
+                  value={formData.VisaSubType}
+                  onChange={(e) => handleInputChange('VisaSubType', e.target.value)}
+                  className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                >
+                  <option value="ALG 1">ALG 1</option>
+                  <option value="ALG 2">ALG 2</option>
+                  <option value="ALG 3">ALG 3</option>
+                  <option value="ALG 4">ALG 4</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="PreviousVisaNumber">Previous Visa Number</Label>
+                <Input
+                  id="PreviousVisaNumber"
+                  value={formData.PreviousVisaNumber}
+                  onChange={(e) => handleInputChange('PreviousVisaNumber', e.target.value)}
+                  placeholder="Enter previous visa number"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="PreviousVisaIssuedCountry">Previous Visa Issued Country</Label>
+                <Input
+                  id="PreviousVisaIssuedCountry"
+                  value={formData.PreviousVisaIssuedCountry}
+                  onChange={(e) => handleInputChange('PreviousVisaIssuedCountry', e.target.value)}
+                  placeholder="Enter issuing country"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="PreviousVisaValidFrom">Previous Visa Valid From (YYYY-MM-DD)</Label>
+                <Input
+                  id="PreviousVisaValidFrom"
+                  value={formData.PreviousVisaValidFrom}
+                  onChange={(e) => handleInputChange('PreviousVisaValidFrom', e.target.value)}
+                  placeholder="YYYY-MM-DD"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="PreviousVisaValidTo">Previous Visa Valid To (YYYY-MM-DD)</Label>
+                <Input
+                  id="PreviousVisaValidTo"
+                  value={formData.PreviousVisaValidTo}
+                  onChange={(e) => handleInputChange('PreviousVisaValidTo', e.target.value)}
+                  placeholder="YYYY-MM-DD"
+                />
               </div>
             </div>
           </CardContent>
